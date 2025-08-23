@@ -1,0 +1,6 @@
+# Example configuration for RAG project
+ollama_url: "http://localhost:11434"
+model_name: "deepseek-r1:1.5b"
+timeout: "30s"
+log_level: "info"
+api_port: 8080
