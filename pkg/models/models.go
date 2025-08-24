@@ -1,7 +1,5 @@
 package models
 
-// Domain models matching the database schema in db/migrations/0001_init.sql
-
 type Engineer struct {
 	ID           int64  `json:"id" db:"id"`
 	Name         string `json:"name" db:"name" validate:"required"`

@@ -19,9 +19,11 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
+
 	if err := conn.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping db: %w", err)
 	}
+	
 	return &DB{conn: conn}, nil
 }
 
@@ -38,6 +40,11 @@ func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, 
 // QueryRow executes a query that is expected to return at most one row
 func (db *DB) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
 	return db.conn.QueryRowContext(ctx, query, args...)
+}
+
+// QueryRows executes a query that returns multiple rows
+func (db *DB) QueryRows(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return db.conn.QueryContext(ctx, query, args...)
 }
 
 // GetConn returns the underlying sql.DB

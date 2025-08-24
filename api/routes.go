@@ -20,12 +20,7 @@ func SetupRoutes(cfg *config.Config, version, buildTime string, db *db.DB) *mux.
 
 	// Create handlers
 	systemHandler := &SystemHandler{}
-	authHandler := &AuthHandler{
-		engineerRepo:  repo,
-		profileRepo:   repo,
-		jwtSecret:     cfg.JWTSecret,
-		tokenDuration: cfg.TokenDuration,
-	}
+	authHandler := NewAuthHandler(repo, repo, cfg.JWTSecret, cfg.TokenDuration)
 
 	// Open endpoints
 	r.HandleFunc("/version", systemHandler.VersionHandler(version, buildTime)).Methods("GET")

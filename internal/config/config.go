@@ -32,11 +32,13 @@ func LoadConfig(path string) (*Config, error) {
 			return nil, err
 		}
 		defer f.Close()
+
 		dec := yaml.NewDecoder(f)
 		if err := dec.Decode(cfg); err != nil {
 			return nil, err
 		}
 	}
+
 	return cfg, nil
 }
 
@@ -44,5 +46,6 @@ func getEnv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
+	
 	return def
 }

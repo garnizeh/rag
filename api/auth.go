@@ -19,6 +19,11 @@ type AuthHandler struct {
 	tokenDuration time.Duration
 }
 
+// NewAuthHandler creates a new AuthHandler with required dependencies.
+func NewAuthHandler(er repository.EngineerRepo, pr repository.ProfileRepo, jwtSecret string, tokenDuration time.Duration) *AuthHandler {
+	return &AuthHandler{engineerRepo: er, profileRepo: pr, jwtSecret: jwtSecret, tokenDuration: tokenDuration}
+}
+
 type signupRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
@@ -106,7 +111,7 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 
 	// Get password hash from engineers table
 	engineer, err := h.engineerRepo.GetByEmail(ctx, req.Email)
-	if err != nil {
+	if err != nil || engineer == nil {
 		http.Error(w, "Credentials not found", http.StatusUnauthorized)
 		return
 	}

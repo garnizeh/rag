@@ -154,7 +154,7 @@ func (r *SQLiteRepo) ListByEngineer(ctx context.Context, engineerID int64, limit
 		limit = 50
 	}
 
-	rows, err := r.conn.GetConn().QueryContext(ctx, `SELECT id, engineer_id, activity, created FROM raw_activities WHERE engineer_id = ? ORDER BY created DESC LIMIT ?`, engineerID, limit)
+	rows, err := r.conn.QueryRows(ctx, `SELECT id, engineer_id, activity, created FROM raw_activities WHERE engineer_id = ? ORDER BY created DESC LIMIT ?`, engineerID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (r *SQLiteRepo) CreateQuestion(ctx context.Context, q *models.Question) (in
 }
 
 func (r *SQLiteRepo) ListUnansweredByEngineer(ctx context.Context, engineerID int64) ([]models.Question, error) {
-	rows, err := r.conn.GetConn().QueryContext(ctx, `SELECT id, engineer_id, question, answered, created FROM ai_questions WHERE engineer_id = ? AND answered IS NULL ORDER BY created DESC`, engineerID)
+	rows, err := r.conn.QueryRows(ctx, `SELECT id, engineer_id, question, answered, created FROM ai_questions WHERE engineer_id = ? AND answered IS NULL ORDER BY created DESC`, engineerID)
 	if err != nil {
 		return nil, err
 	}
