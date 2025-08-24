@@ -38,6 +38,15 @@ func (h *ActivitiesHandler) CreateActivity(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// If engineer id not provided in body, try to read from context (set by JWT middleware)
+	if req.EngineerID <= 0 {
+		if v := r.Context().Value(CtxEngineerID); v == nil {
+			if id, ok := v.(int64); ok {
+				req.EngineerID = id
+			}
+		}
+	}
+
 	// Basic validation
 	req.Activity = strings.TrimSpace(req.Activity)
 	if req.EngineerID <= 0 || req.Activity == "" {

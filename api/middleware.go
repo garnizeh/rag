@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,6 +9,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 )
+
+type ctxKey string
+
+const CtxEngineerID ctxKey = "engineer_id"
 
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +77,24 @@ func JWTAuthMiddlewareWithSecret(secret string) mux.MiddlewareFunc {
 				return
 			}
 
-			// Token is valid, continue
+			// Token is valid, extract engineer_id claim if present and put into context
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				if v, found := claims["engineer_id"]; found {
+					// try to handle number types (float64) and ints
+					switch id := v.(type) {
+					case float64:
+						ctx := context.WithValue(r.Context(), CtxEngineerID, int64(id))
+						r = r.WithContext(ctx)
+					case int64:
+						ctx := context.WithValue(r.Context(), CtxEngineerID, id)
+						r = r.WithContext(ctx)
+					case int:
+						ctx := context.WithValue(r.Context(), CtxEngineerID, int64(id))
+						r = r.WithContext(ctx)
+					}
+				}
+			}
+
 			next.ServeHTTP(w, r)
 		})
 	}

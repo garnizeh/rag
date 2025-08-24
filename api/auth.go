@@ -84,8 +84,9 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 	// Issue JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": req.Email,
-		"exp":   time.Now().Add(h.tokenDuration).Unix(),
+		"email":       req.Email,
+		"engineer_id": engineerID,
+		"exp":         time.Now().Add(h.tokenDuration).Unix(),
 	})
 	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
@@ -123,8 +124,9 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 
 	// Issue JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": req.Email,
-		"exp":   time.Now().Add(h.tokenDuration).Unix(),
+		"email":       req.Email,
+		"engineer_id": engineer.ID,
+		"exp":         time.Now().Add(h.tokenDuration).Unix(),
 	})
 	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
