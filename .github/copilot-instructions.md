@@ -1,5 +1,12 @@
 # Copilot Instructions for RAG Project
 
+## Critical Directives
+
+- Always write in english.
+- Always prioritize code quality, readability, and maintainability.
+- Always adhere to Go best practices and idioms.
+- Ensure all code is well-documented and tested.
+
 ## Project Overview
 
 This is a **Retrieval-Augmented Generation (RAG) system** built in Go that integrates with Ollama for local LLM inference. The system combines information retrieval with language model generation to provide enhanced, context-aware responses.
