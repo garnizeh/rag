@@ -1,0 +1,38 @@
+meta {
+  name: CreateOrUpdate Schema
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/v1/ai/schemas
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "version": "v1",
+    "description": "Example schema for greeting",
+    "schema_json": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+}

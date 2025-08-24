@@ -1,6 +1,6 @@
 -- Initial migration: create all required tables
 
-CREATE TABLE engineers (
+CREATE TABLE IF NOT EXISTS engineers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE engineers (
     password_hash TEXT
 );
 
-CREATE TABLE engineer_profiles (
+CREATE TABLE IF NOT EXISTS engineer_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     engineer_id INTEGER NOT NULL,
     bio TEXT,
@@ -16,7 +16,7 @@ CREATE TABLE engineer_profiles (
     FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE CASCADE
 );
 
-CREATE TABLE raw_activities (
+CREATE TABLE IF NOT EXISTS raw_activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     engineer_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE raw_activities (
     FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE CASCADE
 );
 
-CREATE TABLE ai_questions (
+CREATE TABLE IF NOT EXISTS ai_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     engineer_id INTEGER NOT NULL,
     question TEXT NOT NULL,
@@ -33,15 +33,15 @@ CREATE TABLE ai_questions (
     FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE CASCADE
 );
 
-CREATE TABLE processing_jobs (
+CREATE TABLE IF NOT EXISTS processing_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     status TEXT NOT NULL,
     created INTEGER NOT NULL
 );
 
 -- Indexes for performance
-CREATE INDEX idx_activities_engineer_created ON raw_activities(engineer_id, created);
-CREATE INDEX idx_questions_engineer_answered ON ai_questions(engineer_id, answered);
-CREATE INDEX idx_jobs_status_created ON processing_jobs(status, created);
-CREATE INDEX idx_engineers_updated ON engineers(updated);
-CREATE INDEX idx_profiles_updated ON engineer_profiles(updated);
+CREATE INDEX IF NOT EXISTS idx_activities_engineer_created ON raw_activities(engineer_id, created);
+CREATE INDEX IF NOT EXISTS idx_questions_engineer_answered ON ai_questions(engineer_id, answered);
+CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON processing_jobs(status, created);
+CREATE INDEX IF NOT EXISTS idx_engineers_updated ON engineers(updated);
+CREATE INDEX IF NOT EXISTS idx_profiles_updated ON engineer_profiles(updated);

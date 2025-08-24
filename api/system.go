@@ -1,22 +1,30 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 )
 
-type SystemHandler struct{}
-
-func (h *SystemHandler) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, `{"status":"ok","service":"rag"}`)
+type SystemHandler struct {
+	version   string
+	buildTime string
 }
 
-func (h *SystemHandler) VersionHandler(version, buildTime string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"version":"%s","buildTime":"%s"}`, version, buildTime)
+func NewSystemHandler(version, buildTime string) *SystemHandler {
+	return &SystemHandler{version: version, buildTime: buildTime}
+}
+
+func (h *SystemHandler) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]string{
+		"status":  "ok",
+		"service": "rag",
 	}
+	writeJSON(w, resp, http.StatusOK)
+}
+
+func (h *SystemHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]string{
+		"version":   h.version,
+		"buildTime": h.buildTime,
+	}
+	writeJSON(w, resp, http.StatusOK)
 }

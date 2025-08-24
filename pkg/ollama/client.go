@@ -11,15 +11,29 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/garnizeh/rag/internal/config"
 	"github.com/ollama/ollama/api"
 )
 
 var ErrCircuitOpen = errors.New("ollama circuit open")
 
+// DefaultConfig returns a sensible default configuration.
+func DefaultConfig() config.OllamaConfig {
+	return config.OllamaConfig{
+		BaseURL:                 "http://localhost:11434",
+		DefaultModelNames:       []string{"deepseek-r1:32b", "llama3"},
+		Timeout:                 30 * time.Second,
+		Retries:                 3,
+		Backoff:                 500 * time.Millisecond,
+		CircuitFailureThreshold: 5,
+		CircuitReset:            30 * time.Second,
+	}
+}
+
 // Client wraps the Ollama API client and adds retries, timeout, and circuit breaker.
 type Client struct {
 	api    *api.Client
-	cfg    Config
+	cfg    config.OllamaConfig
 	client *http.Client
 
 	// simple circuit breaker state
@@ -28,7 +42,7 @@ type Client struct {
 }
 
 // NewClient creates a new Ollama client wrapper.
-func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
+func NewClient(cfg config.OllamaConfig, httpClient *http.Client) (*Client, error) {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: cfg.Timeout}
 	}
@@ -45,7 +59,7 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	}, nil
 }
 
-func NewDefaultClient(cfg Config) (*Client, error) {
+func NewDefaultClient(cfg config.OllamaConfig) (*Client, error) {
 	defaultClient := &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,

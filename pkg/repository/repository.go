@@ -6,6 +6,17 @@ import (
 	"github.com/garnizeh/rag/pkg/models"
 )
 
+type Repository struct {
+	Engineer EngineerRepo
+	Profile  ProfileRepo
+	Activity ActivityRepo
+	Question QuestionRepo
+	Job      JobRepo
+	Schema   SchemaRepo
+	Template TemplateRepo
+}
+
+
 // Repository interfaces for domain entities. These are the public contracts
 // consumers should depend on; concrete implementations live under internal/.
 
@@ -38,4 +49,18 @@ type QuestionRepo interface {
 type JobRepo interface {
 	CreateJob(ctx context.Context, j *models.Job) (int64, error)
 	UpdateStatus(ctx context.Context, id int64, status string) error
+}
+
+type SchemaRepo interface {
+	CreateSchema(ctx context.Context, version, description, schemaJSON string) (int64, error)
+	GetSchemaByVersion(ctx context.Context, version string) (*models.Schema, error)
+	ListSchemas(ctx context.Context) ([]models.Schema, error)
+	DeleteSchema(ctx context.Context, version string) error
+}
+
+type TemplateRepo interface {
+	CreateTemplate(ctx context.Context, name, version, templateText string, schemaVersion *string, metadata *string) (int64, error)
+	GetTemplate(ctx context.Context, name, version string) (*models.Template, error)
+	ListTemplates(ctx context.Context) ([]models.Template, error)
+	DeleteTemplate(ctx context.Context, name, version string) error
 }

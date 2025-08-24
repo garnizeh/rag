@@ -11,7 +11,7 @@ import (
 )
 
 func TestSystemHandlers(t *testing.T) {
-	h := &api.SystemHandler{}
+	h := api.NewSystemHandler("1.2.3", "2025-08-24T00:00:00Z")
 
 	// HealthHandler
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -23,6 +23,7 @@ func TestSystemHandlers(t *testing.T) {
 		t.Fatalf("health: expected 200 got %d", res.StatusCode)
 	}
 	if ct := res.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+
 		t.Fatalf("health: expected json content-type, got %q", ct)
 	}
 	b, _ := io.ReadAll(res.Body)
@@ -31,10 +32,9 @@ func TestSystemHandlers(t *testing.T) {
 	}
 
 	// VersionHandler
-	vh := h.VersionHandler("1.2.3", "2025-08-24T00:00:00Z")
 	req2 := httptest.NewRequest(http.MethodGet, "/version", nil)
 	w2 := httptest.NewRecorder()
-	vh(w2, req2)
+	h.VersionHandler(w2, req2)
 	res2 := w2.Result()
 	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {

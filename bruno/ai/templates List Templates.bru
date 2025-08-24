@@ -1,0 +1,19 @@
+meta {
+  name: List Templates
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/v1/ai/templates
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+settings {
+  encodeUrl: true
+}

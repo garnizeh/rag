@@ -78,9 +78,7 @@ func (h *ActivitiesHandler) CreateActivity(w http.ResponseWriter, r *http.Reques
 		fmt.Println("warning: failed to create job:", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(postActivityResponse{ID: id})
+	writeJSON(w, postActivityResponse{ID: id}, http.StatusCreated)
 }
 
 func (h *ActivitiesHandler) ListActivities(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +120,10 @@ func (h *ActivitiesHandler) ListActivities(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if acts == nil {
+		acts = []models.Activity{}
+	}
+
 	resp := map[string]any{
 		"total":  total,
 		"limit":  limit,
@@ -129,6 +131,5 @@ func (h *ActivitiesHandler) ListActivities(w http.ResponseWriter, r *http.Reques
 		"items":  acts,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, resp, http.StatusOK)
 }

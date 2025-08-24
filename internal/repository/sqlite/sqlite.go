@@ -1,0 +1,30 @@
+package sqlite
+
+import (
+	"time"
+
+	"github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/pkg/repository"
+)
+
+// SQLiteRepo implements repository interfaces using the internal DB wrapper.
+type SQLiteRepo struct {
+	conn *db.DB
+}
+
+// Ensure SQLiteRepo implements the public interfaces.
+var _ repository.EngineerRepo = (*SQLiteRepo)(nil)
+var _ repository.ProfileRepo = (*SQLiteRepo)(nil)
+var _ repository.ActivityRepo = (*SQLiteRepo)(nil)
+var _ repository.QuestionRepo = (*SQLiteRepo)(nil)
+var _ repository.JobRepo = (*SQLiteRepo)(nil)
+var _ repository.SchemaRepo = (*SQLiteRepo)(nil)
+var _ repository.TemplateRepo = (*SQLiteRepo)(nil)
+
+func New(conn *db.DB) *SQLiteRepo {
+	return &SQLiteRepo{conn: conn}
+}
+
+func now() int64 {
+	return time.Now().UTC().UnixMilli()
+}

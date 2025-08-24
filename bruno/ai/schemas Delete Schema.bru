@@ -1,0 +1,23 @@
+meta {
+  name: Delete Schema
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{base_url}}/v1/ai/schemas/delete?version=v1
+  body: none
+  auth: bearer
+}
+
+params:query {
+  version: v1
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+settings {
+  encodeUrl: true
+}

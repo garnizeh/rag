@@ -9,46 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/pkg/models"
 	"github.com/garnizeh/rag/pkg/ollama"
-
-	"github.com/qri-io/jsonschema"
+	"github.com/garnizeh/rag/pkg/repository"
 )
-
-// PromptTemplate holds a versioned prompt template.
-type PromptTemplate struct {
-	Version  string
-	Template string
-	Example  string
-}
-
-// DefaultActivityTemplate is a simple initial prompt template (versioned).
-var DefaultActivityTemplate = PromptTemplate{
-	Version: "v1",
-	Template: `You are an assistant that analyzes short activity logs and returns a strict JSON object.
-Return only a single JSON object. The JSON must conform to the following fields:
-- version: string (template version)
-- summary: short string summarizing the activity
-- entities: { people: [string], projects: [string], technologies: [string] }
-- confidence: number between 0.0 and 1.0
-- context_update: boolean (true if this activity should change stored context)
-- reasoning: explanation of how you arrived at the answer
-
-Activity: {{.Activity.Activity}}
-Context: {{.Context}}
-
-Example:
-{
-  "version": "v1",
-  "summary": "Updated README with deployment notes",
-  "entities": {"people":["Alice"], "projects":["deploy-svc"], "technologies":["Docker"]},
-  "confidence": 0.92,
-  "context_update": true,
-  "reasoning": "Activity mentions deployment and Docker, likely relevant to deploy-svc."
-}
-`,
-	Example: "see template",
-}
 
 // AIResponse represents the structured response we expect from the LLM.
 type AIResponse struct {
@@ -67,25 +32,18 @@ type AIResponse struct {
 	Raw string `json:"-"`
 }
 
-// EngineConfig configures the AI engine behavior.
-type EngineConfig struct {
-	Model         string
-	Template      PromptTemplate
-	Timeout       time.Duration
-	MinConfidence float64
-}
-
 // Engine wraps an Ollama client and provides analysis helpers.
 type Engine struct {
 	client *ollama.Client
-	cfg    EngineConfig
+	cfg    config.EngineConfig
+	loader *Loader
 }
 
-// NewEngine creates a new AI engine.
-func NewEngine(client *ollama.Client, cfg EngineConfig) *Engine {
+// NewEngine creates a new AI engine. Loader is required for schema validation.
+func NewEngine(ctx context.Context, client *ollama.Client, cfg config.EngineConfig, sr repository.SchemaRepo, tr repository.TemplateRepo) (*Engine, error) {
 	// apply sensible defaults
 	if cfg.Template.Version == "" {
-		cfg.Template = DefaultActivityTemplate
+		cfg.Template.Version = "v1"
 	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 20 * time.Second
@@ -94,7 +52,32 @@ func NewEngine(client *ollama.Client, cfg EngineConfig) *Engine {
 		cfg.MinConfidence = 0.5
 	}
 
-	return &Engine{client: client, cfg: cfg}
+	if sr == nil {
+		return nil, fmt.Errorf("schema repo is required")
+	}
+
+	if tr == nil {
+		return nil, fmt.Errorf("template repo is required")
+	}
+
+	loader, err := NewLoader(ctx, sr)
+	if err != nil {
+		return nil, fmt.Errorf("create loader: %w", err)
+	}
+
+	// load template for activity from DB; fail if not present
+	tpl, terr := tr.GetTemplate(ctx, "activity", cfg.Template.Version)
+	if terr != nil {
+		return nil, fmt.Errorf("load template: %w", terr)
+	}
+	if tpl == nil || tpl.TemplateTxt == "" {
+		return nil, fmt.Errorf("template activity:%s not found", cfg.Template.Version)
+	}
+	cfg.Template.Template = tpl.TemplateTxt
+	cfg.Template.Version = tpl.Version
+	cfg.Template.SchemaVersion = tpl.SchemaVer
+
+	return &Engine{client: client, cfg: cfg, loader: loader}, nil
 }
 
 // AnalyzeActivity renders a prompt for an activity, sends it to Ollama, and parses the structured response.
@@ -116,6 +99,7 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 	}
 
 	// parse response
+
 	resp, perr := ParseAIResponse(out)
 	if perr != nil {
 		// log raw output for debugging and return a structured error
@@ -129,13 +113,45 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 		resp.Version = e.cfg.Template.Version
 	}
 
+	// validate against loader-provided schema
+	j := extractJSON(out)
+	if j == "" {
+		return nil, fmt.Errorf("no JSON object found in response")
+	}
+
+	// prefer template's schema_version if provided
+	schemaVer := resp.Version
+	if e.cfg.Template.SchemaVersion != nil && *e.cfg.Template.SchemaVersion != "" {
+		schemaVer = *e.cfg.Template.SchemaVersion
+	}
+
+	schema, ok := e.loader.GetSchema(schemaVer)
+	if !ok || schema == nil {
+		return nil, fmt.Errorf("no schema found for version %s", schemaVer)
+	}
+
+	verrs, err := schema.ValidateBytes(ctxReq, []byte(j))
+	if err != nil {
+		log.Printf("ai schema validate error: %v", err)
+		return nil, fmt.Errorf("schema validate error: %w", err)
+	}
+	if len(verrs) > 0 {
+		var sb strings.Builder
+		for _, v := range verrs {
+			sb.WriteString(v.Message)
+			sb.WriteString("; ")
+		}
+		return nil, fmt.Errorf("response does not match schema: %s", sb.String())
+	}
+
 	// assess confidence
 	assessed := AssessConfidence(resp)
 	if resp.Confidence == nil {
 		resp.Confidence = &assessed
 	}
 
-	// validate
+	// validate confidence threshold
+
 	if *resp.Confidence < e.cfg.MinConfidence {
 		log.Printf("low confidence (%.2f) for activity id=%d", *resp.Confidence, activity.ID)
 	}
@@ -154,6 +170,10 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 	return resp, nil
 }
 
+func (e *Engine) ReloadSchemas(ctx context.Context) error {
+	return e.loader.Reload(ctx)
+}
+
 // ParseAIResponse tries to extract a JSON object from arbitrary model output and unmarshal it.
 func ParseAIResponse(s string) (*AIResponse, error) {
 	if strings.TrimSpace(s) == "" {
@@ -169,60 +189,6 @@ func ParseAIResponse(s string) (*AIResponse, error) {
 	if err := json.Unmarshal([]byte(j), &r); err != nil {
 		return nil, fmt.Errorf("json unmarshal: %w", err)
 	}
-
-	// Validate against JSON Schema (basic inline schema)
-	schemaJSON := []byte(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"required": ["version","summary","entities","context_update","reasoning"],
-		"properties": {
-			"version": {"type":"string"},
-			"summary": {"type":"string"},
-			"entities": {
-				"type":"object",
-				"properties": {
-					"people": {"type":"array","items":{"type":"string"}},
-					"projects": {"type":"array","items":{"type":"string"}},
-					"technologies": {"type":"array","items":{"type":"string"}}
-				}
-			},
-			"confidence": {"type":"number"},
-			"context_update": {"type":"boolean"},
-			"reasoning": {"type":"string"}
-		}
-	}`)
-
-	rs := &jsonschema.Schema{}
-	if err := json.Unmarshal(schemaJSON, rs); err != nil {
-		// schema load error: log and continue (don't fail parsing on internal schema problems)
-		log.Printf("ai schema load error: %v", err)
-		return &r, nil
-	}
-
-	// validate the raw JSON map
-	var raw interface{}
-	if err := json.Unmarshal([]byte(j), &raw); err != nil {
-		return &r, nil // should not happen since we already unmarshaled
-	}
-
-	verrs, err := rs.ValidateBytes(context.Background(), []byte(j))
-	if err != nil {
-		// validation execution error: log and allow
-		log.Printf("ai schema validate error: %v", err)
-		return &r, nil
-	}
-	if len(verrs) > 0 {
-		// collect messages
-		var sb strings.Builder
-		for _, v := range verrs {
-			sb.WriteString(v.Message)
-			sb.WriteString("; ")
-		}
-		return &r, fmt.Errorf("response does not match schema: %s", sb.String())
-	}
-
-	// success
-	_ = raw
 	return &r, nil
 }
 

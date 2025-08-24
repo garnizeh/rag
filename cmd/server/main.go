@@ -11,8 +11,12 @@ import (
 	"time"
 
 	"github.com/garnizeh/rag/api"
+	"github.com/garnizeh/rag/internal/ai"
 	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/internal/repository/sqlite"
+	"github.com/garnizeh/rag/pkg/ollama"
+	"github.com/garnizeh/rag/pkg/repository"
 )
 
 var (
@@ -39,7 +43,31 @@ func main() {
 		log.Fatalf("Failed to open DB: %v", err)
 	}
 
-	handler := api.SetupRoutes(cfg, version, buildTime, db)
+	// Repository
+	sqliteRepo := sqlite.New(db)
+	repo := repository.Repository{
+		Engineer: sqliteRepo,
+		Profile:  sqliteRepo,
+		Activity: sqliteRepo,
+		Question: sqliteRepo,
+		Job:      sqliteRepo,
+		Schema:   sqliteRepo,
+		Template: sqliteRepo,
+	}
+
+	// Ollama client
+	client, err := ollama.NewDefaultClient(ollama.DefaultConfig())
+	if err != nil {
+		log.Fatalf("Failed to create Ollama client: %v", err)
+	}
+
+	// AI engine
+	aiEngine, err := ai.NewEngine(ctx, client, cfg.EngineConfig, sqliteRepo, sqliteRepo)
+	if err != nil {
+		log.Fatalf("Failed to initialize AI engine: %v", err)
+	}
+
+	handler := api.SetupRoutes(cfg, version, buildTime, repo, aiEngine)
 
 	// Create HTTP server
 	server := &http.Server{

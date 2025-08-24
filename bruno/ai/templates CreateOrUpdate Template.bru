@@ -1,0 +1,32 @@
+meta {
+  name: CreateOrUpdate Template
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/v1/ai/templates
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "greeting",
+    "version": "v1",
+    "template_text": "Hello {{name}}",
+    "schema_version": "v1"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

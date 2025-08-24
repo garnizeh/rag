@@ -35,3 +35,23 @@ type Job struct {
 	Status  string `json:"status" db:"status"`
 	Created int64  `json:"created" db:"created"`
 }
+
+type Schema struct {
+	ID          int64  `json:"id" db:"id"`
+	Version     string `json:"version" db:"version"`
+	Description string `json:"description,omitempty" db:"description"`
+	SchemaJSON  string `json:"schema_json" db:"schema_json"`
+	Created     int64  `json:"created" db:"created"`
+	Updated     int64  `json:"updated" db:"updated"`
+}
+
+type Template struct {
+	ID          int64   `json:"id" db:"id"`
+	Name        string  `json:"name" db:"name"`
+	Version     string  `json:"version" db:"version"`
+	TemplateTxt string  `json:"template_text" db:"template_text"`
+	SchemaVer   *string `json:"schema_version,omitempty" db:"schema_version"`
+	Metadata    *string `json:"metadata,omitempty" db:"metadata"`
+	Created     int64   `json:"created" db:"created"`
+	Updated     int64   `json:"updated" db:"updated"`
+}

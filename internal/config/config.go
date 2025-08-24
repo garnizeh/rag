@@ -13,6 +13,31 @@ type Config struct {
 	APITimeout    time.Duration `yaml:"timeout"`
 	DatabasePath  string        `yaml:"database_path"`
 	TokenDuration time.Duration `yaml:"token_duration"`
+	EngineConfig  EngineConfig  `yaml:"engine"`
+}
+
+type EngineConfig struct {
+	Model         string         `yaml:"model"`
+	Template      PromptTemplate `yaml:"template"`
+	Timeout       time.Duration  `yaml:"timeout"`
+	MinConfidence float64        `yaml:"min_confidence"`
+}
+
+type PromptTemplate struct {
+	Version       string  `yaml:"version"`
+	Template      string  `yaml:"template"`
+	Example       string  `yaml:"example"`
+	SchemaVersion *string `yaml:"schema_version,omitempty"`
+}
+
+type OllamaConfig struct {
+	BaseURL                 string        `yaml:"base_url"`
+	DefaultModelNames       []string      `yaml:"models"`
+	Timeout                 time.Duration `yaml:"timeout"`
+	Retries                 int           `yaml:"retries"`
+	Backoff                 time.Duration `yaml:"backoff"`
+	CircuitFailureThreshold int           `yaml:"circuit_failure_threshold"`
+	CircuitReset            time.Duration `yaml:"circuit_reset"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -46,6 +71,6 @@ func getEnv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	
+
 	return def
 }

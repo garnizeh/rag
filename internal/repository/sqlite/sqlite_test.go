@@ -25,6 +25,8 @@ func setupRepo(t *testing.T) (*sqlite.SQLiteRepo, func()) {
 		`CREATE TABLE IF NOT EXISTS raw_activities (id INTEGER PRIMARY KEY AUTOINCREMENT, engineer_id INTEGER, activity TEXT, created INTEGER);`,
 		`CREATE TABLE IF NOT EXISTS ai_questions (id INTEGER PRIMARY KEY AUTOINCREMENT, engineer_id INTEGER, question TEXT, answered INTEGER, created INTEGER);`,
 		`CREATE TABLE IF NOT EXISTS processing_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, status TEXT, created INTEGER);`,
+		`CREATE TABLE IF NOT EXISTS ai_schemas (id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT UNIQUE, description TEXT, schema_json TEXT, created INTEGER, updated INTEGER);`,
+		`CREATE TABLE IF NOT EXISTS ai_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, version TEXT, template_text TEXT, schema_version TEXT, metadata TEXT, created INTEGER, updated INTEGER, UNIQUE(name, version));`,
 	}
 
 	for _, s := range stmts {
@@ -285,5 +287,95 @@ func TestJobCreateAndUpdate(t *testing.T) {
 
 	if _, err := repo.CreateJob(ctx, nil); err == nil {
 		t.Fatalf("expected error when creating nil job")
+	}
+}
+
+func TestSchemaCRUD(t *testing.T) {
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	// create schema
+	schema := `{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","required":["version"]}`
+	id, err := repo.CreateSchema(ctx, "v1", "v1 schema", schema)
+	if err != nil {
+		t.Fatalf("CreateSchema error: %v", err)
+	}
+	if id == 0 {
+		t.Fatalf("expected schema id > 0")
+	}
+
+	got, err := repo.GetSchemaByVersion(ctx, "v1")
+	if err != nil {
+		t.Fatalf("GetSchemaByVersion error: %v", err)
+	}
+	if got == nil || got.Version != "v1" {
+		t.Fatalf("unexpected schema: %#v", got)
+	}
+
+	// list
+	list, err := repo.ListSchemas(ctx)
+	if err != nil {
+		t.Fatalf("ListSchemas error: %v", err)
+	}
+	if len(list) == 0 {
+		t.Fatalf("expected at least one schema")
+	}
+
+	// delete
+	if err := repo.DeleteSchema(ctx, "v1"); err != nil {
+		t.Fatalf("DeleteSchema error: %v", err)
+	}
+
+	after, err := repo.GetSchemaByVersion(ctx, "v1")
+	if err != nil {
+		t.Fatalf("GetSchemaByVersion after delete error: %v", err)
+	}
+	if after != nil {
+		t.Fatalf("expected nil after delete got: %#v", after)
+	}
+}
+
+func TestTemplateCRUD(t *testing.T) {
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	// create template without schema
+	tid, err := repo.CreateTemplate(ctx, "tpl1", "v1", "hello {{.Activity}}", nil, nil)
+	if err != nil {
+		t.Fatalf("CreateTemplate error: %v", err)
+	}
+	if tid == 0 {
+		t.Fatalf("expected template id > 0")
+	}
+
+	got, err := repo.GetTemplate(ctx, "tpl1", "v1")
+	if err != nil {
+		t.Fatalf("GetTemplate error: %v", err)
+	}
+	if got == nil || got.Name != "tpl1" {
+		t.Fatalf("unexpected template: %#v", got)
+	}
+
+	// list
+	list, err := repo.ListTemplates(ctx)
+	if err != nil {
+		t.Fatalf("ListTemplates error: %v", err)
+	}
+	if len(list) == 0 {
+		t.Fatalf("expected at least one template")
+	}
+
+	// delete
+	if err := repo.DeleteTemplate(ctx, "tpl1", "v1"); err != nil {
+		t.Fatalf("DeleteTemplate error: %v", err)
+	}
+	after, err := repo.GetTemplate(ctx, "tpl1", "v1")
+	if err != nil {
+		t.Fatalf("GetTemplate after delete error: %v", err)
+	}
+	if after != nil {
+		t.Fatalf("expected nil after delete got: %#v", after)
 	}
 }
