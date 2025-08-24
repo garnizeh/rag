@@ -6,15 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/pkg/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
-	DB            *db.DB
-	JWTSecret     string
-	TokenDuration time.Duration
+	engineerRepo  repository.EngineerRepo
+	profileRepo   repository.ProfileRepo
+	jwtSecret     string
+	tokenDuration time.Duration
 }
 
 type signupRequest struct {
@@ -51,30 +53,26 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	now := time.Now().UTC().UnixMilli()
 
 	// Insert engineer with password_hash and return the new id (SQLite RETURNING)
-	var engineerID int64
-	if err = h.DB.QueryRow(
-		ctx,
-		"INSERT INTO engineers (name, email, updated, password_hash) VALUES (?, ?, ?, ?) RETURNING id",
-		req.Name,
-		req.Email,
-		now,
-		string(hash),
-	).Scan(&engineerID); err != nil {
+	engineer := models.Engineer{
+		Name:         req.Name,
+		Email:        req.Email,
+		PasswordHash: string(hash),
+	}
+
+	engineerID, err := h.engineerRepo.CreateEngineer(ctx, &engineer)
+	if err != nil {
 		http.Error(w, "Error creating user", http.StatusInternalServerError)
 		return
 	}
 
 	// Create an empty profile row linked to the new engineer id
-	if _, err := h.DB.Exec(
-		ctx,
-		"INSERT INTO engineer_profiles (engineer_id, bio, updated) VALUES (?, ?, ?)",
-		engineerID,
-		"{}",
-		now,
-	); err != nil {
+	profile := models.Profile{
+		EngineerID: engineerID,
+		Bio:        "{}",
+	}
+	if _, err := h.profileRepo.CreateProfile(ctx, &profile); err != nil {
 		http.Error(w, "Error creating user profile", http.StatusInternalServerError)
 		return
 	}
@@ -82,9 +80,9 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	// Issue JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": req.Email,
-		"exp":   time.Now().Add(h.TokenDuration).Unix(),
+		"exp":   time.Now().Add(h.tokenDuration).Unix(),
 	})
-	tokenStr, err := token.SignedString([]byte(h.JWTSecret))
+	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
 		http.Error(w, "Error signing token", http.StatusInternalServerError)
 		return
@@ -104,16 +102,16 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	// Get password hash from engineers table
-	var hash string
-	err := h.DB.QueryRow(r.Context(),
-		"SELECT password_hash FROM engineers WHERE email = ?", req.Email).Scan(&hash)
+	engineer, err := h.engineerRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		http.Error(w, "Credentials not found", http.StatusUnauthorized)
 		return
 	}
 
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
+	if bcrypt.CompareHashAndPassword([]byte(engineer.PasswordHash), []byte(req.Password)) != nil {
 		http.Error(w, "Credentials not found", http.StatusUnauthorized)
 		return
 	}
@@ -121,14 +119,14 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 	// Issue JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": req.Email,
-		"exp":   time.Now().Add(h.TokenDuration).Unix(),
+		"exp":   time.Now().Add(h.tokenDuration).Unix(),
 	})
-	tokenStr, err := token.SignedString([]byte(h.JWTSecret))
+	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
 		http.Error(w, "Error signing token", http.StatusInternalServerError)
 		return
 	}
-	
+
 	json.NewEncoder(w).Encode(authResponse{Token: tokenStr})
 }
 

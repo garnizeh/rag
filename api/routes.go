@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/internal/repository/sqlite"
 	"github.com/gorilla/mux"
 )
 
@@ -14,12 +15,16 @@ func SetupRoutes(cfg *config.Config, version, buildTime string, db *db.DB) *mux.
 	r.Use(CORSMiddleware)
 	r.Use(RecoveryMiddleware)
 
+	// Repository
+	repo := sqlite.New(db)
+
 	// Create handlers
 	systemHandler := &SystemHandler{}
 	authHandler := &AuthHandler{
-		DB:            db,
-		JWTSecret:     cfg.JWTSecret,
-		TokenDuration: cfg.TokenDuration,
+		engineerRepo:  repo,
+		profileRepo:   repo,
+		jwtSecret:     cfg.JWTSecret,
+		tokenDuration: cfg.TokenDuration,
 	}
 
 	// Open endpoints
