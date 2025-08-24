@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/internal/db"
 )
 
 func main() {
 	ctx := context.Background()
-	dsn := "rag.db"
-	database, err := db.New(ctx, dsn)
+	cfg, err := config.LoadConfig("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
+		os.Exit(1)
+	}
+	database, err := db.New(ctx, cfg.DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "DB init error: %v\n", err)
 		os.Exit(1)

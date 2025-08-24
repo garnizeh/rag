@@ -4,11 +4,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/garnizeh/rag/internal/config"
 )
 
 func main() {
-	src := "rag.db.bak"
-	dst := "rag.db"
+	cfg, err := config.LoadConfig("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
+		os.Exit(1)
+	}
+	src := cfg.DatabasePath + ".bak"
+	dst := cfg.DatabasePath
 
 	srcFile, err := os.Open(src)
 	if err != nil {

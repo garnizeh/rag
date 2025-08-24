@@ -8,16 +8,23 @@ import (
 )
 
 type Config struct {
-	Addr      string        `yaml:"addr"`
-	JWTSecret string        `yaml:"jwt_secret"`
-	Timeout   time.Duration `yaml:"timeout"`
+	Addr          string        `yaml:"addr"`
+	JWTSecret     string        `yaml:"jwt_secret"`
+	APITimeout    time.Duration `yaml:"timeout"`
+	DatabasePath  string        `yaml:"database_path"`
+	TokenDuration time.Duration `yaml:"token_duration"`
 }
 
 func LoadConfig(path string) (*Config, error) {
+	apiTimeout := 15 * time.Second
+	tokenDuration := 1 * time.Hour
+
 	cfg := &Config{
-		Addr:      getEnv("RAG_ADDR", ":8080"),
-		JWTSecret: getEnv("RAG_JWT_SECRET", "supersecretkey"),
-		Timeout:   15 * time.Second,
+		Addr:          getEnv("RAG_ADDR", ":8080"),
+		JWTSecret:     getEnv("RAG_JWT_SECRET", "supersecretkey"),
+		APITimeout:    apiTimeout,
+		DatabasePath:  getEnv("RAG_DATABASE_PATH", "rag.db"),
+		TokenDuration: tokenDuration,
 	}
 	if path != "" {
 		f, err := os.Open(path)

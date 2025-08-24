@@ -1,0 +1,23 @@
+meta {
+  name: Signout
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/v1/auth/signout
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+settings {
+  encodeUrl: true
+}

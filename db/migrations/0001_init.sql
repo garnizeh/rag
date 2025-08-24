@@ -4,7 +4,8 @@ CREATE TABLE engineers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    updated INTEGER NOT NULL
+    updated INTEGER NOT NULL,
+    password_hash TEXT
 );
 
 CREATE TABLE engineer_profiles (

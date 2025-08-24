@@ -31,8 +31,13 @@ func (db *DB) Close() error {
 }
 
 // Exec executes a query
-func (db *DB) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return db.conn.ExecContext(ctx, query, args...)
+}
+
+// QueryRow executes a query that is expected to return at most one row
+func (db *DB) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
+	return db.conn.QueryRowContext(ctx, query, args...)
 }
 
 // GetConn returns the underlying sql.DB

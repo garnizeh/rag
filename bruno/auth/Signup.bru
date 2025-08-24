@@ -1,0 +1,37 @@
+meta {
+  name: Signup
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/v1/auth/signup
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "123"
+  }
+}
+
+script:post-response {
+  let jsonResponse = res.body;
+  if (jsonResponse.token) {
+      bru.setEnvVar("jwt_token", jsonResponse.token);
+      console.log("Token has been set: " + jsonResponse.token);
+  } else {
+      console.log("Token not found or request failed.");
+  }
+}
+
+settings {
+  encodeUrl: true
+}
