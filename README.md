@@ -17,7 +17,7 @@ A Go-based RAG system that integrates with Ollama for enhanced text generation w
 
 ## Quick Start
 
-### 1. Clone and Setup
+1) Clone and setup
 
 ```bash
 git clone <repository-url>
@@ -25,21 +25,39 @@ cd rag
 make dev-setup
 ```
 
-### 2. Install Ollama
+2) Install Ollama
 
 Follow the [Ollama installation guide](https://ollama.ai) for your platform.
 
-### 3. Pull a Model
+3) Pull a model (example)
 
 ```bash
 ollama pull deepseek-r1:1.5b
 ```
 
-### 4. Run Development Client
+4) Initialize the database (apply migrations and seed)
+
+There is a script to apply migrations and seed initial AI schema/template data. Run:
+
+```bash
+go run ./scripts/db_init
+```
+
+5) Run the server (development)
+
+```bash
+make run
+# or
+go run ./cmd/server
+```
+
+6) Run the development Ollama client (optional)
 
 ```bash
 make dev-client
 ```
+
+Default server URL: http://localhost:8080
 
 ## Project Structure
 
@@ -60,6 +78,55 @@ rag/
 ```
 
 ## Development
+- [qri-io/jsonschema](https://github.com/qri-io/jsonschema) - JSON Schema compilation/validation used for schema validation on write
+
+## AI API examples (quick)
+
+Below are minimal curl examples to exercise the AI schema/template endpoints exposed under `/v1/ai` (the `/v1` prefix is protected by JWT middleware in normal runs).
+
+Create or update a schema
+
+```bash
+curl -X POST http://localhost:8080/v1/ai/schemas \
+	-H "Authorization: Bearer $JWT" \
+	-H "Content-Type: application/json" \
+	-d '{"version":"v1","description":"Greeting schema","schema_json":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"name":{"type":"string"}},"required":["name"]}}'
+```
+
+Get a schema by version
+
+```bash
+curl -X GET "http://localhost:8080/v1/ai/schemas/get?version=v1" -H "Authorization: Bearer $JWT"
+```
+
+Reload compiled schemas (invalidate cache)
+
+```bash
+curl -X POST http://localhost:8080/v1/ai/schemas/reload -H "Authorization: Bearer $JWT"
+```
+
+Create or update a template
+
+```bash
+curl -X POST http://localhost:8080/v1/ai/templates \
+	-H "Authorization: Bearer $JWT" \
+	-H "Content-Type: application/json" \
+	-d '{"name":"greeting","version":"v1","template_text":"Hello {{name}}","schema_version":"v1"}'
+```
+
+Get a template
+
+```bash
+curl -X GET "http://localhost:8080/v1/ai/templates/get?name=greeting&version=v1" -H "Authorization: Bearer $JWT"
+```
+
+Delete a template
+
+```bash
+curl -X DELETE "http://localhost:8080/v1/ai/templates/delete?name=greeting&version=v1" -H "Authorization: Bearer $JWT"
+```
+
+Bruno collection: the `bruno/` folder in the repo contains pre-built requests (signup/signin, schema/template examples). Use `local.bru` to set `base_url` and manage `jwt_token` when running with Bruno.
 
 ### Available Make Targets
 
@@ -133,7 +200,7 @@ The system follows Go best practices and standard project layout:
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT License. See the `LICENSE` file in the repository root for the full text.
 
 ## Support
 
