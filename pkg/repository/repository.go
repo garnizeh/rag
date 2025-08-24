@@ -26,7 +26,8 @@ type ProfileRepo interface {
 
 type ActivityRepo interface {
 	CreateActivity(ctx context.Context, a *models.Activity) (int64, error)
-	ListByEngineer(ctx context.Context, engineerID int64, limit int) ([]models.Activity, error)
+	ListByEngineer(ctx context.Context, engineerID int64, limit, offset int) ([]models.Activity, error)
+	CountActivitiesByEngineer(ctx context.Context, engineerID int64) (int64, error)
 }
 
 type QuestionRepo interface {

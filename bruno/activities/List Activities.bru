@@ -1,0 +1,25 @@
+meta {
+  name: List Activities
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/v1/activities?engineer_id=1&limit=2&offset=2
+  body: none
+  auth: bearer
+}
+
+params:query {
+  engineer_id: 1
+  limit: 2
+  offset: 2
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+settings {
+  encodeUrl: true
+}

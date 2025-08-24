@@ -83,7 +83,7 @@ func TestAuthHandlers(t *testing.T) {
 				if ar.Token == "" {
 					t.Fatalf("empty token")
 				}
-				if _, err := jwt.Parse(ar.Token, func(token *jwt.Token) (interface{}, error) { return []byte(secret), nil }); err != nil {
+				if _, err := jwt.Parse(ar.Token, func(token *jwt.Token) (any, error) { return []byte(secret), nil }); err != nil {
 					t.Fatalf("invalid token: %v", err)
 				}
 			},
@@ -158,7 +158,7 @@ func TestAuthHandlers(t *testing.T) {
 				if ar.Token == "" {
 					t.Fatalf("empty token")
 				}
-				if _, err := jwt.Parse(ar.Token, func(token *jwt.Token) (interface{}, error) { return []byte(secret), nil }); err != nil {
+				if _, err := jwt.Parse(ar.Token, func(token *jwt.Token) (any, error) { return []byte(secret), nil }); err != nil {
 					t.Fatalf("invalid token: %v", err)
 				}
 			},
@@ -234,7 +234,7 @@ func TestAuthHandlers(t *testing.T) {
 					Token string `json:"token"`
 				}
 				if err := json.Unmarshal(data, &ar); err == nil && ar.Token != "" {
-					tok, err := jwt.Parse(ar.Token, func(token *jwt.Token) (interface{}, error) { return []byte(secret), nil })
+					tok, err := jwt.Parse(ar.Token, func(token *jwt.Token) (any, error) { return []byte(secret), nil })
 					if err != nil {
 						t.Fatalf("parse token: %v", err)
 					}

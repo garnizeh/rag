@@ -141,7 +141,7 @@ func (r *SQLiteRepo) CreateActivity(ctx context.Context, a *models.Activity) (in
 		return 0, fmt.Errorf("activity is nil")
 	}
 
-	res, err := r.conn.Exec(ctx, `INSERT INTO raw_activities (engineer_id, activity, created) VALUES (?, ?, ?)`, a.EngineerID, a.Activity, now())
+	res, err := r.conn.Exec(ctx, `INSERT INTO raw_activities (engineer_id, activity, created) VALUES (?, ?, ?)`, a.EngineerID, a.Activity, a.Created)
 	if err != nil {
 		return 0, err
 	}
@@ -149,12 +149,15 @@ func (r *SQLiteRepo) CreateActivity(ctx context.Context, a *models.Activity) (in
 	return res.LastInsertId()
 }
 
-func (r *SQLiteRepo) ListByEngineer(ctx context.Context, engineerID int64, limit int) ([]models.Activity, error) {
+func (r *SQLiteRepo) ListByEngineer(ctx context.Context, engineerID int64, limit, offset int) ([]models.Activity, error) {
 	if limit <= 0 {
 		limit = 50
 	}
+	if offset < 0 {
+		offset = 0
+	}
 
-	rows, err := r.conn.QueryRows(ctx, `SELECT id, engineer_id, activity, created FROM raw_activities WHERE engineer_id = ? ORDER BY created DESC LIMIT ?`, engineerID, limit)
+	rows, err := r.conn.GetConn().QueryContext(ctx, `SELECT id, engineer_id, activity, created FROM raw_activities WHERE engineer_id = ? ORDER BY created DESC LIMIT ? OFFSET ?`, engineerID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +174,16 @@ func (r *SQLiteRepo) ListByEngineer(ctx context.Context, engineerID int64, limit
 	}
 
 	return out, nil
+}
+
+// CountActivitiesByEngineer returns the total number of activities for an engineer.
+func (r *SQLiteRepo) CountActivitiesByEngineer(ctx context.Context, engineerID int64) (int64, error) {
+	row := r.conn.GetConn().QueryRowContext(ctx, `SELECT COUNT(*) FROM raw_activities WHERE engineer_id = ?`, engineerID)
+	var cnt int64
+	if err := row.Scan(&cnt); err != nil {
+		return 0, err
+	}
+	return cnt, nil
 }
 
 // Question methods

@@ -197,7 +197,7 @@ func TestActivityAndQuestionList(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	acts, err := repo.ListByEngineer(ctx, eid, 2)
+	acts, err := repo.ListByEngineer(ctx, eid, 2, 0)
 	if err != nil {
 		t.Fatalf("ListByEngineer error: %v", err)
 	}
@@ -205,12 +205,46 @@ func TestActivityAndQuestionList(t *testing.T) {
 		t.Fatalf("expected 2 activities got %d", len(acts))
 	}
 
-	acts, err = repo.ListByEngineer(ctx, eid, -10)
+	acts, err = repo.ListByEngineer(ctx, eid, -10, 0)
 	if err != nil {
 		t.Fatalf("ListByEngineer error: %v", err)
 	}
 	if len(acts) != 3 {
 		t.Fatalf("expected 3 activities got %d", len(acts))
+	}
+
+	// Offset pagination: first page (limit=2, offset=0) and second page (limit=2, offset=2)
+	page1, err := repo.ListByEngineer(ctx, eid, 2, 0)
+	if err != nil {
+		t.Fatalf("ListByEngineer page1 error: %v", err)
+	}
+	page2, err := repo.ListByEngineer(ctx, eid, 2, 2)
+	if err != nil {
+		t.Fatalf("ListByEngineer page2 error: %v", err)
+	}
+	if len(page1)+len(page2) != 3 {
+		t.Fatalf("expected combined pages to cover 3 activities got %d", len(page1)+len(page2))
+	}
+
+	// ensure no duplicate IDs across pages
+	seen := map[int64]bool{}
+	for _, a := range page1 {
+		seen[a.ID] = true
+	}
+	for _, a := range page2 {
+		if seen[a.ID] {
+			t.Fatalf("duplicate activity id across pages: %d", a.ID)
+		}
+		seen[a.ID] = true
+	}
+
+	// offset beyond range should return empty slice
+	beyond, err := repo.ListByEngineer(ctx, eid, 10, 100)
+	if err != nil {
+		t.Fatalf("ListByEngineer beyond error: %v", err)
+	}
+	if len(beyond) != 0 {
+		t.Fatalf("expected 0 activities for large offset got %d", len(beyond))
 	}
 
 	// questions
