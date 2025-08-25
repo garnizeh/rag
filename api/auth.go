@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"log/slog"
+
 	"github.com/garnizeh/rag/pkg/models"
 	"github.com/garnizeh/rag/pkg/repository"
 	"github.com/golang-jwt/jwt/v5"
@@ -94,7 +96,12 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(authResponse{Token: tokenStr})
+	if err := json.NewEncoder(w).Encode(authResponse{Token: tokenStr}); err != nil {
+		// Encoding a JSON response failed — log and return 500
+		logger.Error("encode auth response failed", slog.Any("err", err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +141,11 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(authResponse{Token: tokenStr})
+	if err := json.NewEncoder(w).Encode(authResponse{Token: tokenStr}); err != nil {
+		logger.Error("encode auth response failed", slog.Any("err", err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *AuthHandler) Signout(w http.ResponseWriter, r *http.Request) {

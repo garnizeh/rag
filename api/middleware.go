@@ -75,7 +75,11 @@ func JWTAuthMiddlewareWithSecret(secret string) mux.MiddlewareFunc {
 			}
 
 			var tokenString string
-			fmt.Sscanf(authHeader, "Bearer %s", &tokenString)
+			if _, err := fmt.Sscanf(authHeader, "Bearer %s", &tokenString); err != nil {
+				// If scanning fails, log and treat as invalid header
+				logger.Error("failed to parse Authorization header", slog.Any("err", err), slog.String("header", authHeader))
+			}
+
 			if tokenString == "" {
 				http.Error(w, "Invalid Authorization header", http.StatusUnauthorized)
 				return
