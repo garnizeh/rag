@@ -168,19 +168,18 @@ type ModelInfo struct {
 	Raw  json.RawMessage `json:"-"`
 }
 
-// ListModels calls the Ollama /models endpoint and returns basic model info.
+// ListModels calls the Ollama /api/tags endpoint and returns basic model info.
 func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	if c.isCircuitOpen() {
 		return nil, ErrCircuitOpen
 	}
 
-	// build URL: base + /models
+	// build URL: use /api/tags (Ollama models metadata endpoint)
 	base, err := url.Parse(c.cfg.BaseURL)
 	if err != nil {
 		return nil, err
 	}
-
-	u := base.ResolveReference(&url.URL{Path: "/models"})
+	u := base.ResolveReference(&url.URL{Path: "/api/tags"})
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		c.recordFailure()
@@ -199,15 +198,49 @@ func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		return nil, fmt.Errorf("models endpoint returned status %d", resp.StatusCode)
 	}
 
-	var raw []map[string]any
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&raw); err != nil {
+	// Ollama's /api/tags may return either a JSON array of models or an object
+	// containing a `models` array. Support both shapes for forward/backward
+	// compatibility.
+	var dec = json.NewDecoder(resp.Body)
+
+	// try decoding into a generic value first
+	var v any
+	if err := dec.Decode(&v); err != nil {
 		c.recordFailure()
-		return nil, err
+		return nil, fmt.Errorf("failed to decode models response: %w", err)
 	}
 
-	out := make([]ModelInfo, 0, len(raw))
-	for _, m := range raw {
+	var items []map[string]any
+
+	switch t := v.(type) {
+	case map[string]any:
+		// object - look for a `models` key which should be an array
+		if rawModels, ok := t["models"]; ok {
+			if arr, ok := rawModels.([]any); ok {
+				items = make([]map[string]any, 0, len(arr))
+				for _, e := range arr {
+					if m, ok := e.(map[string]any); ok {
+						items = append(items, m)
+					}
+				}
+			}
+		} else {
+			// Some versions might return a map keyed by model name; try to
+			// interpret each entry as a model object.
+			items = make([]map[string]any, 0, len(t))
+			for _, e := range t {
+				if m, ok := e.(map[string]any); ok {
+					items = append(items, m)
+				}
+			}
+		}
+	default:
+		c.recordFailure()
+		return nil, fmt.Errorf("unexpected models response type: %T", v)
+	}
+
+	out := make([]ModelInfo, 0, len(items))
+	for _, m := range items {
 		name := ""
 		if v, ok := m["name"].(string); ok {
 			name = v

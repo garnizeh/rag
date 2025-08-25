@@ -119,62 +119,12 @@ func main() {
 	// propagate logger into AI subsystem for consistent structured logs
 	ai.SetLogger(logger)
 
-	// Background probe: periodically try to (re)create and health-check Ollama client
-	go func() {
-		ticker := time.NewTicker(cfg.Ollama.Backoff)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-rootCtx.Done():
-				return
-			case <-ticker.C:
-				// attempt to create new client and health-check
-				c, cerr := ollama.NewDefaultClient(cfg.Ollama)
-				if cerr != nil {
-					// can't create client; set engine to degraded
-					aiEngine.SetClient(nil)
-					logger.Warn("Ollama probe: client create failed", slog.Any("err", cerr))
-					// close any old client we may have stored
-					clientMu.Lock()
-					old := client
-					client = nil
-					clientMu.Unlock()
-					if old != nil {
-						_ = old.Close()
-					}
-					continue
-				}
-				probeCtx, probeCancel := context.WithTimeout(rootCtx, cfg.Ollama.Timeout)
-				if herr := c.Health(probeCtx); herr != nil {
-					aiEngine.SetClient(nil)
-					logger.Warn("Ollama probe: health failed", slog.Any("err", herr))
-					probeCancel()
-					// close newly created client
-					_ = c.Close()
-					// ensure stored client is nil
-					clientMu.Lock()
-					old := client
-					client = nil
-					clientMu.Unlock()
-					if old != nil {
-						_ = old.Close()
-					}
-					continue
-				}
-				probeCancel()
-				// success: update engine client and swap stored client
-				clientMu.Lock()
-				old := client
-				client = c
-				clientMu.Unlock()
-				aiEngine.SetClient(c)
-				logger.Info("Ollama probe: client healthy, engine updated")
-				if old != nil {
-					_ = old.Close()
-				}
-			}
-		}
-	}()
+	// Start Ollama probe within the AI engine so it manages client lifecycle and
+	// only probes when the engine is in degraded mode. Provide a derived context
+	// so the probe stops when the server shuts down.
+	probeCtx, probeCancel := context.WithCancel(rootCtx)
+	aiEngine.StartOllamaProbe(probeCtx, cfg.Ollama)
+	defer probeCancel()
 
 	handler := api.SetupRoutes(cfg, version, buildTime, repo, aiEngine, database, logger)
 

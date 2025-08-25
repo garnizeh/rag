@@ -11,12 +11,12 @@ import (
 type Config struct {
 	Addr           string        `yaml:"addr"`
 	JWTSecret      string        `yaml:"jwt_secret"`
-	APITimeout     time.Duration `yaml:"timeout"`
 	DatabasePath   string        `yaml:"database_path"`
+	APITimeout     time.Duration `yaml:"timeout"`
 	TokenDuration  time.Duration `yaml:"token_duration"`
+	MigrateOnStart bool          `yaml:"migrate_on_start"`
 	EngineConfig   EngineConfig  `yaml:"engine"`
 	Ollama         OllamaConfig  `yaml:"ollama"`
-	MigrateOnStart bool          `yaml:"migrate_on_start"`
 }
 
 type EngineConfig struct {

@@ -14,9 +14,9 @@ import (
 func TestClient_ListModelsAndHealth_Success(t *testing.T) {
 	// mock server that returns a simple models list
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/models" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/tags" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[{"name":"test-model"}]`))
+			_, _ = w.Write([]byte(`{"models":[{"name":"test-model"}]}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -48,9 +48,9 @@ func TestClient_ListModelsAndHealth_Success(t *testing.T) {
 func TestClient_Health_NoModels_Fails(t *testing.T) {
 	// server returns empty array for models
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/models" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/tags" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[]`))
+			_, _ = w.Write([]byte(`{"models":[]}`))
 			return
 		}
 		http.NotFound(w, r)

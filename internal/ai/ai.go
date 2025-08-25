@@ -211,8 +211,59 @@ func (e *Engine) ReloadSchemas(ctx context.Context) error {
 // Passing nil puts the engine into degraded mode.
 func (e *Engine) SetClient(c *ollama.Client) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	old := e.client
 	e.client = c
+	e.mu.Unlock()
+
+	// close previous client if present to free resources
+	if old != nil && old != c {
+		_ = old.Close()
+	}
+}
+
+// StartOllamaProbe runs a background goroutine that attempts to (re)create and
+// health-check an Ollama client when the engine is in degraded mode (no client).
+// The probe uses the provided Ollama config for connection parameters and
+// backoff. It returns immediately; the probe stops when ctx is cancelled.
+func (e *Engine) StartOllamaProbe(ctx context.Context, cfg config.OllamaConfig) {
+	go func() {
+		ticker := time.NewTicker(cfg.Backoff)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				// only attempt probe when engine has no client (degraded mode)
+				e.mu.RLock()
+				has := e.client != nil
+				e.mu.RUnlock()
+				if has {
+					continue
+				}
+
+				// try to create a new client
+				c, err := ollama.NewDefaultClient(cfg)
+				if err != nil {
+					logger.Warn("Ollama probe: client create failed", slog.Any("err", err))
+					continue
+				}
+
+				probeCtx, probeCancel := context.WithTimeout(ctx, cfg.Timeout)
+				if herr := c.Health(probeCtx); herr != nil {
+					logger.Warn("Ollama probe: health failed", slog.Any("err", herr))
+					probeCancel()
+					_ = c.Close()
+					continue
+				}
+				probeCancel()
+
+				// success: update engine client
+				e.SetClient(c)
+				logger.Info("Ollama probe: client healthy, engine updated")
+			}
+		}
+	}()
 }
 
 // Available reports whether an LLM client is currently configured.
