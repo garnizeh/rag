@@ -6,6 +6,8 @@
 - Always prioritize code quality, readability, and maintainability.
 - Always adhere to Go best practices and idioms.
 - Ensure all code is well-documented and tested.
+- All test files MUST have the sufix _test in the package name, we only want to test exported functions.
+- When suggesting code, always consider performance implications, security best practices, error handling, logging.
 
 ## Project Overview
 

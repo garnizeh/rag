@@ -140,6 +140,12 @@ Bruno collection: the `bruno/` folder in the repo contains pre-built requests (s
 - `make lint` - Run linter
 - `make clean` - Clean build artifacts
 
+Additional CI-related targets added for convenience:
+
+- `make ci-smoke` - Run focused CI smoke tests locally (migrations + ollama)
+- `make ci-lint` - Run linter locally (mirror CI)
+- `make ci-full` - Run full test suite with coverage and write coverage.out
+
 ### Development Workflow
 
 1. **Setup**: `make dev-setup`
@@ -153,6 +159,33 @@ Configuration files should be placed in the `configs/` directory. Examples:
 
 - `config.example.yaml` - Example configuration
 - `config.example.json` - Alternative JSON format
+
+### Example YAML snippet (configs/dev.yaml)
+
+```yaml
+addr: ":8080"
+jwt_secret: "your_jwt_secret_key"
+database_path: "rag.db"
+timeout: "15s"
+token_duration: "1h"
+migrate_on_start: true
+
+engine:
+	model: "deepseek-r1:1.5b"
+	timeout: "20s"
+	min_confidence: 0.5
+	template_version: "v1"
+
+ollama:
+	base_url: "http://localhost:11434"
+	models:
+		- "deepseek-r1:1.5b"
+	timeout: "30s"
+	retries: 3
+	backoff: "500ms"
+	circuit_failure_threshold: 5
+	circuit_reset: "30s"
+```
 
 ## Dependencies
 

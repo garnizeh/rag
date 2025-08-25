@@ -1,3 +1,43 @@
 addr: ":8080"
 jwt_secret: "your_jwt_secret_key"
 database_path: "rag.db"
+# API timeout for Read/Write operations (Go time.Duration string)
+timeout: "15s"
+# JWT token duration (Go time.Duration string)
+token_duration: "1h"
+# If true the server will attempt to run migrations and seed data on startup
+migrate_on_start: true
+
+engine:
+	# Ollama/model name used by the AI engine
+	model: "deepseek-r1:1.5b"
+	# Per-engine timeout
+	timeout: "20s"
+	# Minimum confidence threshold for extraction/decisions
+	min_confidence: 0.5
+	# Template version to select from DB (templates are stored in database and managed at runtime)
+	template_version: "v1"
+
+ollama:
+	# Base URL where Ollama is reachable
+	base_url: "http://localhost:11434"
+	# Default model names to consider when selecting a model
+	models:
+		- "deepseek-r1:1.5b"
+	# HTTP client timeout for Ollama requests
+	# Examples: "30s", "1m", "500ms" (Go time.Duration format)
+	timeout: "30s"
+	# Number of retries for Generate operations
+	retries: 3
+	# Backoff duration between retry attempts
+	# Example backoff value: "500ms"
+	backoff: "500ms"
+	# Circuit breaker: number of consecutive failures to open circuit
+	circuit_failure_threshold: 5
+	# Circuit reset duration
+	# Example circuit reset: "30s" or "1m"
+	circuit_reset: "30s"
+
+# Notes:
+# - Durations must be valid Go duration strings (see https://pkg.go.dev/time#ParseDuration).
+# - When running tests locally, you can set RAG_ENV=development to allow the insecure default JWT for convenience.

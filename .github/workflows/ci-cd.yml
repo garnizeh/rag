@@ -1,0 +1,77 @@
+name: CI — lint / unit / integration
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    name: CI: ${{ matrix.job }}
+    runs-on: ubuntu-latest
+    env:
+      RAG_ENV: development
+    strategy:
+      matrix:
+        job: [lint, unit, integration]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run linter
+        if: matrix.job == 'lint'
+        run: |
+          # Makefile provides install-lint target which will install golangci-lint if missing
+          make install-lint
+          make lint
+
+      - name: Run unit tests
+        if: matrix.job == 'unit'
+        run: |
+          # Run fast unit tests across the repo
+          go test -v -coverprofile=coverage.out ./...
+      - name: Upload unit coverage
+        if: matrix.job == 'unit'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage.out
+
+      - name: Run integration tests
+        if: matrix.job == 'integration'
+        run: |
+          # Focused integration checks: migrations, ollama client behavior, and a quick startup-related test
+          go test -v -coverprofile=coverage.out ./internal/db -run TestMigrateOnStart_TempWorkdir
+          go test -v -covermode=atomic -coverprofile=coverage.pkg_ollama.out ./pkg/ollama
+      - name: Merge coverage files
+        if: matrix.job == 'integration'
+        run: |
+          # merge coverage files (simple concat for Go tool)
+          if [ -f coverage.pkg_ollama.out ]; then tail -n +2 coverage.pkg_ollama.out >> coverage.out || true; fi
+      - name: Upload integration coverage
+        if: matrix.job == 'integration'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage.out
+          # final quick check that runs the same targeted startup test repo-wide
+          go test -v ./... -run TestMigrateOnStart_TempWorkdir

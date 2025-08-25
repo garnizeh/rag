@@ -5,16 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 
+	"os"
+
+	"log/slog"
+
 	_ "modernc.org/sqlite"
 )
 
 // DB wraps the sql.DB for connection management
 type DB struct {
-	conn *sql.DB
+	conn   *sql.DB
+	logger *slog.Logger
 }
 
 // New creates a new DB connection
-func New(ctx context.Context, dsn string) (*DB, error) {
+func New(ctx context.Context, dsn string, logger *slog.Logger) (*DB, error) {
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
@@ -23,8 +28,11 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	if err := conn.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping db: %w", err)
 	}
-	
-	return &DB{conn: conn}, nil
+
+	if logger == nil {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	}
+	return &DB{conn: conn, logger: logger}, nil
 }
 
 // Close closes the DB connection

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -16,19 +18,6 @@ import (
 )
 
 var ErrCircuitOpen = errors.New("ollama circuit open")
-
-// DefaultConfig returns a sensible default configuration.
-func DefaultConfig() config.OllamaConfig {
-	return config.OllamaConfig{
-		BaseURL:                 "http://localhost:11434",
-		DefaultModelNames:       []string{"deepseek-r1:32b", "llama3"},
-		Timeout:                 30 * time.Second,
-		Retries:                 3,
-		Backoff:                 500 * time.Millisecond,
-		CircuitFailureThreshold: 5,
-		CircuitReset:            30 * time.Second,
-	}
-}
 
 // Client wraps the Ollama API client and adds retries, timeout, and circuit breaker.
 type Client struct {
@@ -39,6 +28,14 @@ type Client struct {
 	// simple circuit breaker state
 	failures  int32
 	openUntil int64 // unix nano
+	closed    int32 // atomic flag for Close()
+}
+
+// GenerateResult is a typed representation of a model response.
+type GenerateResult struct {
+	Text string          `json:"text"`
+	Raw  json.RawMessage `json:"raw"`
+	Meta map[string]any  `json:"meta,omitempty"`
 }
 
 // NewClient creates a new Ollama client wrapper.
@@ -52,11 +49,20 @@ func NewClient(cfg config.OllamaConfig, httpClient *http.Client) (*Client, error
 		return nil, fmt.Errorf("invalid base url: %w", err)
 	}
 
-	return &Client{
+	c := &Client{
 		api:    api.NewClient(u, httpClient),
 		cfg:    cfg,
 		client: httpClient,
-	}, nil
+	}
+	// use package logger
+	logger.Info("ollama: NewClient created", slog.String("base_url", cfg.BaseURL), slog.Duration("timeout", cfg.Timeout))
+	return c, nil
+}
+
+// Instrumentation: log client creation for easier debugging
+func init() {
+	// no-op init to keep package initialization explicit; logging happens in NewClient
+	_ = 0
 }
 
 func NewDefaultClient(cfg config.OllamaConfig) (*Client, error) {
@@ -91,6 +97,36 @@ func (c *Client) isCircuitOpen() bool {
 	// attempt half-open: reset failures and allow a request
 	atomic.StoreInt32(&c.failures, 0)
 	return false
+}
+
+// Close releases any resources held by the client. Currently this will close
+// idle connections on the underlying HTTP transport when supported. Close is
+// idempotent and safe to call multiple times.
+func (c *Client) Close() error {
+	if c == nil {
+		return nil
+	}
+	// ensure we only run close once
+	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
+		return nil
+	}
+	if c.client != nil && c.client.Transport != nil {
+		if tr, ok := c.client.Transport.(interface{ CloseIdleConnections() }); ok {
+			tr.CloseIdleConnections()
+			logger.Info("ollama: client Close() called - CloseIdleConnections invoked")
+		}
+	}
+	return nil
+}
+
+// package-level logger for pkg/ollama; can be replaced by callers
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+// SetLogger sets the logger used by pkg/ollama. Passing nil is a no-op.
+func SetLogger(l *slog.Logger) {
+	if l != nil {
+		logger = l
+	}
 }
 
 func (c *Client) recordFailure() {
@@ -186,26 +222,47 @@ func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
 
 // Generate sends a prompt to the model and collects the response. It supports retries and timeouts.
 // Generate sends a prompt to Ollama and returns a string representation of the response.
-func (c *Client) Generate(ctx context.Context, model string, prompt string) (string, error) {
+func (c *Client) Generate(ctx context.Context, model string, prompt string) (GenerateResult, error) {
 	var lastErr error
+	var empty GenerateResult
 	if c.isCircuitOpen() {
-		return "", ErrCircuitOpen
+		return empty, ErrCircuitOpen
 	}
 
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		ctxReq, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
-		// cancel on next loop
 		req := &api.GenerateRequest{Model: model, Prompt: prompt}
-		var out string
+		var lastRaw any
+		var outText string
+		var lastRawB []byte
+		start := time.Now()
 		err := c.api.Generate(ctxReq, req, func(r api.GenerateResponse) error {
-			out = fmt.Sprintf("%+v", r)
+			// store raw response and a textual representation
+			lastRaw = r
+			// prefer a stable JSON representation of the response as text
+			if b, merr := json.Marshal(r); merr == nil {
+				lastRawB = b
+				outText = string(b)
+			} else {
+				// fallback to a formatted string if marshalling fails
+				outText = fmt.Sprintf("%+v", r)
+			}
 			return nil
 		})
 
 		cancel()
+		latency := time.Since(start)
 		if err == nil {
+			// marshal raw into JSON for Raw field (reuse lastRawB if we created it)
+			var rawB []byte
+			if lastRawB != nil {
+				rawB = lastRawB
+			} else {
+				rawB, _ = json.Marshal(lastRaw)
+			}
 			atomic.StoreInt32(&c.failures, 0)
-			return out, nil
+			meta := map[string]any{"model": model, "latency_ms": latency.Milliseconds()}
+			return GenerateResult{Text: outText, Raw: rawB, Meta: meta}, nil
 		}
 
 		lastErr = err
@@ -214,9 +271,9 @@ func (c *Client) Generate(ctx context.Context, model string, prompt string) (str
 		// backoff
 		time.Sleep(c.cfg.Backoff * time.Duration(attempt+1))
 		if c.isCircuitOpen() {
-			return "", ErrCircuitOpen
+			return empty, ErrCircuitOpen
 		}
 	}
 
-	return "", fmt.Errorf("generate failed after retries: %w", lastErr)
+	return empty, fmt.Errorf("generate failed after retries: %w", lastErr)
 }

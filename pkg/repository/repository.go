@@ -16,7 +16,6 @@ type Repository struct {
 	Template TemplateRepo
 }
 
-
 // Repository interfaces for domain entities. These are the public contracts
 // consumers should depend on; concrete implementations live under internal/.
 

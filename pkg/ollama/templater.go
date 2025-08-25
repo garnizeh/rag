@@ -16,6 +16,6 @@ func RenderTemplate(tmpl string, data any) (string, error) {
 	if err := tpl.Execute(&buf, data); err != nil {
 		return "", err
 	}
-	
+
 	return buf.String(), nil
 }

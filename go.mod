@@ -7,6 +7,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/ollama/ollama v0.11.6
 	github.com/qri-io/jsonschema v0.2.1
+	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.38.2

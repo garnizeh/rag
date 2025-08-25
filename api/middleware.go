@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
+
+	"log/slog"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
@@ -14,9 +16,23 @@ type ctxKey string
 
 const CtxEngineerID ctxKey = "engineer_id"
 
+// package-level logger used by middleware and helpers; can be set via SetLogger from caller
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+// SetLogger installs a logger for the api package. Passing nil is a no-op.
+func SetLogger(l *slog.Logger) {
+	if l != nil {
+		logger = l
+	}
+}
+
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s %s", r.Method, r.URL.Path, r.RemoteAddr)
+		logger.Info("request",
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.String("remote", r.RemoteAddr),
+		)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -40,7 +56,7 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf("panic: %v", err)
+				logger.Error("panic", slog.Any("err", err))
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()

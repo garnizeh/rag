@@ -106,3 +106,18 @@ info: ## Show project information
 
 # Quick development workflow
 quick: fmt test build ## Format, test, and build
+
+ci-smoke: install-deps ## Run CI smoke tasks locally (migrations + ollama tests)
+	@echo "Running CI smoke tasks (RAG_ENV=development)..."
+	RAG_ENV=development go test -v ./internal/db -run TestMigrateOnStart_TempWorkdir
+	RAG_ENV=development go test -v ./pkg/ollama
+	RAG_ENV=development go test -v ./... -run TestMigrateOnStart_TempWorkdir
+
+ci-lint: install-lint ## Run linter locally (mirror CI)
+	@echo "Running linter..."
+	golangci-lint run
+
+ci-full: install-deps ## Run full test suite with coverage and produce coverage.out
+	@echo "Running full test suite with coverage..."
+	RAG_ENV=development go test -coverprofile=coverage.out ./...
+	@echo "Coverage written to coverage.out"

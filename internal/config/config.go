@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -8,26 +9,21 @@ import (
 )
 
 type Config struct {
-	Addr          string        `yaml:"addr"`
-	JWTSecret     string        `yaml:"jwt_secret"`
-	APITimeout    time.Duration `yaml:"timeout"`
-	DatabasePath  string        `yaml:"database_path"`
-	TokenDuration time.Duration `yaml:"token_duration"`
-	EngineConfig  EngineConfig  `yaml:"engine"`
+	Addr           string        `yaml:"addr"`
+	JWTSecret      string        `yaml:"jwt_secret"`
+	APITimeout     time.Duration `yaml:"timeout"`
+	DatabasePath   string        `yaml:"database_path"`
+	TokenDuration  time.Duration `yaml:"token_duration"`
+	EngineConfig   EngineConfig  `yaml:"engine"`
+	Ollama         OllamaConfig  `yaml:"ollama"`
+	MigrateOnStart bool          `yaml:"migrate_on_start"`
 }
 
 type EngineConfig struct {
-	Model         string         `yaml:"model"`
-	Template      PromptTemplate `yaml:"template"`
-	Timeout       time.Duration  `yaml:"timeout"`
-	MinConfidence float64        `yaml:"min_confidence"`
-}
-
-type PromptTemplate struct {
-	Version       string  `yaml:"version"`
-	Template      string  `yaml:"template"`
-	Example       string  `yaml:"example"`
-	SchemaVersion *string `yaml:"schema_version,omitempty"`
+	Model           string        `yaml:"model"`
+	TemplateVersion string        `yaml:"template_version"`
+	Timeout         time.Duration `yaml:"timeout"`
+	MinConfidence   float64       `yaml:"min_confidence"`
 }
 
 type OllamaConfig struct {
@@ -45,11 +41,12 @@ func LoadConfig(path string) (*Config, error) {
 	tokenDuration := 1 * time.Hour
 
 	cfg := &Config{
-		Addr:          getEnv("RAG_ADDR", ":8080"),
-		JWTSecret:     getEnv("RAG_JWT_SECRET", "supersecretkey"),
-		APITimeout:    apiTimeout,
-		DatabasePath:  getEnv("RAG_DATABASE_PATH", "rag.db"),
-		TokenDuration: tokenDuration,
+		Addr:           getEnv("RAG_ADDR", ":8080"),
+		JWTSecret:      getEnv("RAG_JWT_SECRET", "supersecretkey"),
+		APITimeout:     apiTimeout,
+		DatabasePath:   getEnv("RAG_DATABASE_PATH", "rag.db"),
+		TokenDuration:  tokenDuration,
+		MigrateOnStart: false,
 	}
 	if path != "" {
 		f, err := os.Open(path)
@@ -65,6 +62,59 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// Validate ensures required configuration values are present and fills sensible defaults
+// for optional fields. It returns an error when a required or insecure value is found.
+func (c *Config) Validate() error {
+	if c.Addr == "" {
+		return fmt.Errorf("addr must be set")
+	}
+	if c.APITimeout <= 0 {
+		return fmt.Errorf("api timeout must be > 0")
+	}
+	if c.DatabasePath == "" {
+		return fmt.Errorf("database_path must be set")
+	}
+	if c.TokenDuration <= 0 {
+		return fmt.Errorf("token_duration must be > 0")
+	}
+	if c.EngineConfig.Model == "" {
+		// engine model is required for AI features
+		return fmt.Errorf("engine.model must be set")
+	}
+
+	// Reject insecure default JWT secret in non-development environments
+	if c.JWTSecret == "" || c.JWTSecret == "supersecretkey" {
+		if os.Getenv("RAG_ENV") != "development" {
+			return fmt.Errorf("jwt_secret is not set or is insecure; set RAG_JWT_SECRET")
+		}
+	}
+
+	// Provide sensible defaults for Ollama config if not supplied
+	if c.Ollama.BaseURL == "" {
+		c.Ollama.BaseURL = "http://localhost:11434"
+	}
+	if c.Ollama.Timeout == 0 {
+		c.Ollama.Timeout = 30 * time.Second
+	}
+	if c.Ollama.Retries == 0 {
+		c.Ollama.Retries = 3
+	}
+	if c.Ollama.Backoff == 0 {
+		c.Ollama.Backoff = 500 * time.Millisecond
+	}
+	if c.Ollama.CircuitFailureThreshold == 0 {
+		c.Ollama.CircuitFailureThreshold = 5
+	}
+	if c.Ollama.CircuitReset == 0 {
+		c.Ollama.CircuitReset = 30 * time.Second
+	}
+	if len(c.Ollama.DefaultModelNames) == 0 {
+		c.Ollama.DefaultModelNames = []string{"deepseek-r1:32b", "llama3"}
+	}
+
+	return nil
 }
 
 func getEnv(key, def string) string {

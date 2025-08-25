@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"os"
 	"strings"
+	"sync"
 	"time"
+
+	"log/slog"
 
 	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/pkg/models"
@@ -34,16 +37,29 @@ type AIResponse struct {
 
 // Engine wraps an Ollama client and provides analysis helpers.
 type Engine struct {
-	client *ollama.Client
-	cfg    config.EngineConfig
-	loader *Loader
+	cfg                   config.EngineConfig
+	loader                *Loader
+	templateText          string
+	templateSchemaVersion *string
+	mu                    sync.RWMutex
+	client                *ollama.Client
+}
+
+// package logger for ai; can be set by callers via SetLogger
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+// SetLogger sets the logger used by internal/ai package. Passing nil is a no-op.
+func SetLogger(l *slog.Logger) {
+	if l != nil {
+		logger = l
+	}
 }
 
 // NewEngine creates a new AI engine. Loader is required for schema validation.
 func NewEngine(ctx context.Context, client *ollama.Client, cfg config.EngineConfig, sr repository.SchemaRepo, tr repository.TemplateRepo) (*Engine, error) {
 	// apply sensible defaults
-	if cfg.Template.Version == "" {
-		cfg.Template.Version = "v1"
+	if cfg.TemplateVersion == "" {
+		cfg.TemplateVersion = "v1"
 	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 20 * time.Second
@@ -66,25 +82,42 @@ func NewEngine(ctx context.Context, client *ollama.Client, cfg config.EngineConf
 	}
 
 	// load template for activity from DB; fail if not present
-	tpl, terr := tr.GetTemplate(ctx, "activity", cfg.Template.Version)
+	tpl, terr := tr.GetTemplate(ctx, "activity", cfg.TemplateVersion)
 	if terr != nil {
 		return nil, fmt.Errorf("load template: %w", terr)
 	}
 	if tpl == nil || tpl.TemplateTxt == "" {
-		return nil, fmt.Errorf("template activity:%s not found", cfg.Template.Version)
+		return nil, fmt.Errorf("template activity:%s not found", cfg.TemplateVersion)
 	}
-	cfg.Template.Template = tpl.TemplateTxt
-	cfg.Template.Version = tpl.Version
-	cfg.Template.SchemaVersion = tpl.SchemaVer
+	// store selected template version into cfg so other methods can access it
+	cfg.TemplateVersion = tpl.Version
+	// populate engine template fields
+	templateSchema := tpl.SchemaVer
+	// attach schema version to a new field by reusing loader via template metadata
+	// we'll rely on loader + schema repo for validation at runtime using tpl.SchemaVer when needed
 
-	return &Engine{client: client, cfg: cfg, loader: loader}, nil
+	// persist template text by setting an internal field on Engine if needed; keep cfg minimal
+	// (Engine will read tpl.TemplateTxt when producing prompts)
+
+	eng := &Engine{client: client, cfg: cfg, loader: loader, templateText: tpl.TemplateTxt, templateSchemaVersion: templateSchema}
+
+	return eng, nil
 }
 
 // AnalyzeActivity renders a prompt for an activity, sends it to Ollama, and parses the structured response.
 func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, contextText string) (*AIResponse, error) {
+	// If client is nil we are running in degraded mode (no LLM). Return a clear error
+	// so callers can handle or fallback to raw processing. Use a read lock to allow
+	// a background probe to replace the client concurrently.
+	e.mu.RLock()
+	client := e.client
+	e.mu.RUnlock()
+	if client == nil {
+		return nil, fmt.Errorf("llm unavailable: engine running in degraded mode")
+	}
 	// prepare prompt
 	data := map[string]any{"Activity": activity, "Context": contextText}
-	prompt, err := ollama.RenderTemplate(e.cfg.Template.Template, data)
+	prompt, err := ollama.RenderTemplate(e.templateText, data)
 	if err != nil {
 		return nil, fmt.Errorf("render template: %w", err)
 	}
@@ -93,36 +126,36 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 	ctxReq, cancel := context.WithTimeout(ctx, e.cfg.Timeout)
 	defer cancel()
 
-	out, err := e.client.Generate(ctxReq, e.cfg.Model, prompt)
+	res, err := client.Generate(ctxReq, e.cfg.Model, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}
 
 	// parse response
-
-	resp, perr := ParseAIResponse(out)
+	resp, perr := ParseAIResponse(res.Text)
 	if perr != nil {
 		// log raw output for debugging and return a structured error
-		log.Printf("ai parse error: %v; raw=%s", perr, out)
+		logger.Error("ai parse error", slog.Any("err", perr), slog.String("raw", res.Text))
 		return nil, fmt.Errorf("parse response: %w", perr)
 	}
-	resp.Raw = out
+	// store raw textual output for auditing
+	resp.Raw = res.Text
 
 	// fill missing version
 	if resp.Version == "" {
-		resp.Version = e.cfg.Template.Version
+		resp.Version = e.cfg.TemplateVersion
 	}
 
 	// validate against loader-provided schema
-	j := extractJSON(out)
+	j := extractJSON(res.Text)
 	if j == "" {
 		return nil, fmt.Errorf("no JSON object found in response")
 	}
 
 	// prefer template's schema_version if provided
 	schemaVer := resp.Version
-	if e.cfg.Template.SchemaVersion != nil && *e.cfg.Template.SchemaVersion != "" {
-		schemaVer = *e.cfg.Template.SchemaVersion
+	if e.templateSchemaVersion != nil && *e.templateSchemaVersion != "" {
+		schemaVer = *e.templateSchemaVersion
 	}
 
 	schema, ok := e.loader.GetSchema(schemaVer)
@@ -132,7 +165,7 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 
 	verrs, err := schema.ValidateBytes(ctxReq, []byte(j))
 	if err != nil {
-		log.Printf("ai schema validate error: %v", err)
+		logger.Error("ai schema validate error", slog.Any("err", err))
 		return nil, fmt.Errorf("schema validate error: %w", err)
 	}
 	if len(verrs) > 0 {
@@ -153,7 +186,7 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 	// validate confidence threshold
 
 	if *resp.Confidence < e.cfg.MinConfidence {
-		log.Printf("low confidence (%.2f) for activity id=%d", *resp.Confidence, activity.ID)
+		logger.Warn("low confidence for activity", slog.Float64("confidence", *resp.Confidence), slog.Int64("activity_id", activity.ID))
 	}
 
 	// final safety checks
@@ -172,6 +205,21 @@ func (e *Engine) AnalyzeActivity(ctx context.Context, activity models.Activity, 
 
 func (e *Engine) ReloadSchemas(ctx context.Context) error {
 	return e.loader.Reload(ctx)
+}
+
+// SetClient updates the underlying Ollama client in a thread-safe manner.
+// Passing nil puts the engine into degraded mode.
+func (e *Engine) SetClient(c *ollama.Client) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.client = c
+}
+
+// Available reports whether an LLM client is currently configured.
+func (e *Engine) Available() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.client != nil
 }
 
 // ParseAIResponse tries to extract a JSON object from arbitrary model output and unmarshal it.

@@ -13,7 +13,7 @@ func TestNew_Close_GetConn(t *testing.T) {
 	defer cancel()
 
 	// Use in-memory SQLite
-	d, err := dbpkg.New(ctx, "file::memory:?cache=shared")
+	d, err := dbpkg.New(ctx, "file::memory:?cache=shared", nil)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestNew_Close_GetConn(t *testing.T) {
 
 func TestExec_QueryRow(t *testing.T) {
 	ctx := context.Background()
-	d, err := dbpkg.New(ctx, "file::memory:?cache=shared")
+	d, err := dbpkg.New(ctx, "file::memory:?cache=shared", nil)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestExec_QueryRow(t *testing.T) {
 func TestNew_BadDSN(t *testing.T) {
 	ctx := context.Background()
 	// passing invalid driver name will cause sql.Open to error when pinging
-	_, err := dbpkg.New(ctx, ":invalid-dsn:")
+	_, err := dbpkg.New(ctx, ":invalid-dsn:", nil)
 	if err == nil {
 		t.Fatalf("expected error for bad DSN, got nil")
 	}

@@ -13,17 +13,17 @@ import (
 // mock client that implements Generate
 type mockClient struct{}
 
-func (m *mockClient) Generate(ctx context.Context, model string, prompt string) (string, error) {
+func (m *mockClient) Generate(ctx context.Context, model string, prompt string) (ollama.GenerateResult, error) {
 	// return a wrapped JSON to exercise extraction logic
 	out := "Here is the analysis:\n```json\n{" +
 		"\"version\":\"v1\",\"summary\":\"Did a thing\",\"entities\":{\"people\":[\"Bob\"],\"projects\":[\"proj-x\"],\"technologies\":[\"Go\"]},\"confidence\":0.87,\"context_update\":true,\"reasoning\":\"Mentioned proj-x and Go\"}" +
 		"\n```"
-	return out, nil
+	return ollama.GenerateResult{Text: out, Raw: nil}, nil
 }
 
 // ensure mock satisfies the subset of ollama.Client used
 var _ interface {
-	Generate(context.Context, string, string) (string, error)
+	Generate(context.Context, string, string) (ollama.GenerateResult, error)
 } = (*mockClient)(nil)
 
 func TestParseAIResponse(t *testing.T) {
@@ -90,7 +90,7 @@ Example:
 
 	ctx := context.Background()
 
-	_, err = ai.NewEngine(ctx, &ollama.Client{}, config.EngineConfig{Model: "m", Template: config.PromptTemplate{Version: "v1"}}, fake, fakeTpl)
+	_, err = ai.NewEngine(ctx, &ollama.Client{}, config.EngineConfig{Model: "m", TemplateVersion: "v1"}, fake, fakeTpl)
 	if err != nil {
 		t.Fatalf("new engine failed: %v", err)
 	}
@@ -101,7 +101,7 @@ Example:
 	if err != nil {
 		t.Fatalf("mock generate failed: %v", err)
 	}
-	r, err := ai.ParseAIResponse(out)
+	r, err := ai.ParseAIResponse(out.Text)
 	if err != nil {
 		t.Fatalf("parse of mock output failed: %v", err)
 	}

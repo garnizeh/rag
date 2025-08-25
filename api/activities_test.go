@@ -16,7 +16,7 @@ import (
 func setupServer(t *testing.T) (*httptest.Server, func()) {
 	t.Helper()
 	ctx := context.Background()
-	d, err := db.New(ctx, "file::memory:?cache=shared")
+	d, err := db.New(ctx, "file::memory:?cache=shared", nil)
 	if err != nil {
 		t.Fatalf("db.New: %v", err)
 	}
@@ -34,7 +34,7 @@ func setupServer(t *testing.T) (*httptest.Server, func()) {
 		}
 	}
 
-	repo := sqlite.New(d)
+	repo := sqlite.New(d, nil)
 	ah := api.NewActivitiesHandler(repo, repo)
 
 	mux := http.NewServeMux()

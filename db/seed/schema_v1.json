@@ -1,0 +1,51 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "version",
+        "summary",
+        "entities",
+        "context_update",
+        "reasoning"
+    ],
+    "properties": {
+        "version": {
+            "type": "string"
+        },
+        "summary": {
+            "type": "string"
+        },
+        "entities": {
+            "type": "object",
+            "properties": {
+                "people": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "projects": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "technologies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "confidence": {
+            "type": "number"
+        },
+        "context_update": {
+            "type": "boolean"
+        },
+        "reasoning": {
+            "type": "string"
+        }
+    }
+}

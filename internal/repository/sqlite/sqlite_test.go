@@ -13,7 +13,7 @@ import (
 func setupRepo(t *testing.T) (*sqlite.SQLiteRepo, func()) {
 	t.Helper()
 	ctx := context.Background()
-	d, err := dbpkg.New(ctx, "file::memory:?cache=shared")
+	d, err := dbpkg.New(ctx, "file::memory:?cache=shared", nil)
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
@@ -36,7 +36,7 @@ func setupRepo(t *testing.T) (*sqlite.SQLiteRepo, func()) {
 		}
 	}
 
-	repo := sqlite.New(d)
+	repo := sqlite.New(d, nil)
 	return repo, func() { d.Close() }
 }
 

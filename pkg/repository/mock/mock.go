@@ -70,4 +70,4 @@ func (m *mockProfileRepo) GetByEngineerID(ctx context.Context, engineerID int64)
 
 func (m *mockProfileRepo) UpdateProfile(ctx context.Context, p *models.Profile) error { return nil }
 
-func (m *mockProfileRepo) DeleteProfile(ctx context.Context, id int64) error          { return nil }
+func (m *mockProfileRepo) DeleteProfile(ctx context.Context, id int64) error { return nil }

@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"log/slog"
 
 	"github.com/garnizeh/rag/internal/ai"
 	"github.com/garnizeh/rag/internal/config"
+	"github.com/garnizeh/rag/internal/db"
 	"github.com/garnizeh/rag/pkg/repository"
 	"github.com/gorilla/mux"
 )
@@ -17,6 +19,8 @@ func SetupRoutes(
 	buildTime string,
 	repo repository.Repository,
 	aiEngine *ai.Engine,
+	database *db.DB,
+	logger *slog.Logger,
 ) *mux.Router {
 	r := mux.NewRouter()
 
@@ -25,8 +29,11 @@ func SetupRoutes(
 	r.Use(CORSMiddleware)
 	r.Use(RecoveryMiddleware)
 
+	// Install logger for package-level helpers and middleware
+	SetLogger(logger)
+
 	// Create handlers
-	systemHandler := NewSystemHandler(version, buildTime)
+	systemHandler := NewSystemHandler(version, buildTime, database, aiEngine)
 	authHandler := NewAuthHandler(repo.Engineer, repo.Profile, cfg.JWTSecret, cfg.TokenDuration)
 	activitiesHandler := NewActivitiesHandler(repo.Activity, repo.Job)
 	aiHandler := NewAIHandler(repo.Schema, repo.Template, aiEngine)
@@ -34,6 +41,8 @@ func SetupRoutes(
 	// Open endpoints
 	r.HandleFunc("/version", systemHandler.VersionHandler).Methods("GET")
 	r.HandleFunc("/health", systemHandler.HealthHandler).Methods("GET")
+	r.HandleFunc("/ready", systemHandler.ReadinessHandler).Methods("GET")
+	r.HandleFunc("/live", systemHandler.LiveHandler).Methods("GET")
 	r.HandleFunc("/v1/auth/signup", authHandler.Signup).Methods("POST")
 	r.HandleFunc("/v1/auth/signin", authHandler.Signin).Methods("POST")
 
@@ -76,6 +85,7 @@ func writeJSON(w http.ResponseWriter, v any, statusCode int) {
 	w.WriteHeader(statusCode)
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(v); err != nil {
-		log.Printf("Error writing JSON response: %v\n%+v", err, v)
+		// use package logger if available
+		logger.Error("Error writing JSON response", slog.Any("err", err), slog.Any("payload", v))
 	}
 }
