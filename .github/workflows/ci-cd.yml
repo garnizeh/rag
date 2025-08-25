@@ -1,4 +1,4 @@
-name: CI — lint / unit / integration
+name: "CI - lint / unit / integration"
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   ci:
-    name: CI: ${{ matrix.job }}
+    name: "CI: ${{ matrix.job }}"
     runs-on: ubuntu-latest
     env:
       RAG_ENV: development
@@ -62,6 +62,11 @@ jobs:
           # Focused integration checks: migrations, ollama client behavior, and a quick startup-related test
           go test -v -coverprofile=coverage.out ./internal/db -run TestMigrateOnStart_TempWorkdir
           go test -v -covermode=atomic -coverprofile=coverage.pkg_ollama.out ./pkg/ollama
+      - name: Final quick check
+        if: matrix.job == 'integration'
+        run: |
+          # final quick check that runs the same targeted startup test repo-wide
+          go test -v ./... -run TestMigrateOnStart_TempWorkdir
       - name: Merge coverage files
         if: matrix.job == 'integration'
         run: |
@@ -73,5 +78,3 @@ jobs:
         with:
           name: coverage-integration
           path: coverage.out
-          # final quick check that runs the same targeted startup test repo-wide
-          go test -v ./... -run TestMigrateOnStart_TempWorkdir
