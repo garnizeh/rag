@@ -51,3 +51,6 @@ config.yaml
 config.json
 !config.example.yaml
 !config.example.json
+
+# Database files
+rag.db
