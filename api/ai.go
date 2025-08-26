@@ -5,27 +5,32 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/garnizeh/rag/internal/ai"
 	"github.com/garnizeh/rag/pkg/repository"
+	"github.com/gorilla/mux"
 	"github.com/qri-io/jsonschema"
 )
 
 type AIHandler struct {
+	engine       *ai.Engine
 	schemaRepo   repository.SchemaRepo
 	templateRepo repository.TemplateRepo
-	engine       *ai.Engine
+	contextRepo  repository.ContextRepo
 }
 
 func NewAIHandler(
+	engine *ai.Engine,
 	schemaRepo repository.SchemaRepo,
 	templateRepo repository.TemplateRepo,
-	engine *ai.Engine,
+	contextRepo repository.ContextRepo,
 ) *AIHandler {
 	return &AIHandler{
+		engine:       engine,
 		schemaRepo:   schemaRepo,
 		templateRepo: templateRepo,
-		engine:       engine,
+		contextRepo:  contextRepo,
 	}
 }
 
@@ -216,4 +221,55 @@ func (h *AIHandler) DeleteTemplateHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// RollbackContextHandler reverts an engineer's context to a selected history id.
+// Expects URL: /v1/ai/context/rollback/{engineer_id}?history_id={id}
+func (h *AIHandler) RollbackContextHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["engineer_id"]
+	if idStr == "" {
+		http.Error(w, "engineer_id required", http.StatusBadRequest)
+		return
+	}
+	engineerID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid engineer_id", http.StatusBadRequest)
+		return
+	}
+
+	q := r.URL.Query().Get("history_id")
+	if q == "" {
+		http.Error(w, "history_id required", http.StatusBadRequest)
+		return
+	}
+	hid, err := strconv.ParseInt(q, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid history_id", http.StatusBadRequest)
+		return
+	}
+
+	if h.contextRepo == nil {
+		http.Error(w, "context repo unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	found, err := h.contextRepo.GetContextHistoryByID(r.Context(), engineerID, hid)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("get history: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if found == nil {
+		http.Error(w, "history entry not found", http.StatusNotFound)
+		return
+	}
+
+	// apply the historical snapshot
+	newVersion, err := h.contextRepo.UpsertEngineerContext(r.Context(), engineerID, found.ContextJSON, "rollback")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("apply rollback: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{"engineer_id": engineerID, "applied_version": newVersion}, http.StatusOK)
 }

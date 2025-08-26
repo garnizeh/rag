@@ -36,7 +36,7 @@ func SetupRoutes(
 	systemHandler := NewSystemHandler(version, buildTime, database, aiEngine)
 	authHandler := NewAuthHandler(repo.Engineer, repo.Profile, cfg.JWTSecret, cfg.TokenDuration)
 	activitiesHandler := NewActivitiesHandler(repo.Activity, repo.Job)
-	aiHandler := NewAIHandler(repo.Schema, repo.Template, aiEngine)
+	aiHandler := NewAIHandler(aiEngine, repo.Schema, repo.Template, repo.Context)
 
 	// Open endpoints
 	r.HandleFunc("/version", systemHandler.VersionHandler).Methods("GET")
@@ -76,6 +76,10 @@ func SetupRoutes(
 	templateV1.HandleFunc("", aiHandler.CreateOrUpdateTemplateHandler).Methods("POST")
 	templateV1.HandleFunc("/get", aiHandler.GetTemplateHandler).Methods("GET")
 	templateV1.HandleFunc("/delete", aiHandler.DeleteTemplateHandler).Methods("DELETE")
+
+	// AI context endpoints (rollback)
+	contextV1 := aiV1.PathPrefix("/context").Subrouter()
+	contextV1.HandleFunc("/rollback/{engineer_id}", aiHandler.RollbackContextHandler).Methods("POST")
 
 	return r
 }

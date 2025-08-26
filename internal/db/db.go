@@ -55,6 +55,11 @@ func (db *DB) QueryRows(ctx context.Context, query string, args ...any) (*sql.Ro
 	return db.conn.QueryContext(ctx, query, args...)
 }
 
+// BeginTx starts a new transaction
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return db.conn.BeginTx(ctx, opts)
+}
+
 // GetConn returns the underlying sql.DB
 func (db *DB) GetConn() *sql.DB {
 	return db.conn

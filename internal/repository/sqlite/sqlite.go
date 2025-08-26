@@ -21,6 +21,7 @@ var _ repository.ProfileRepo = (*SQLiteRepo)(nil)
 var _ repository.ActivityRepo = (*SQLiteRepo)(nil)
 var _ repository.QuestionRepo = (*SQLiteRepo)(nil)
 var _ repository.JobRepo = (*SQLiteRepo)(nil)
+var _ repository.ContextRepo = (*SQLiteRepo)(nil)
 var _ repository.SchemaRepo = (*SQLiteRepo)(nil)
 var _ repository.TemplateRepo = (*SQLiteRepo)(nil)
 

@@ -2,29 +2,14 @@ package jobs
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/garnizeh/rag/internal/models"
 )
 
-// Job represents a background job
-type Job struct {
-	ID          int64           `json:"id"`
-	Type        string          `json:"type"`
-	Payload     json.RawMessage `json:"payload"`
-	Status      string          `json:"status"`
-	Attempts    int             `json:"attempts"`
-	MaxAttempts int             `json:"max_attempts"`
-	Priority    int             `json:"priority"`
-	ScheduledAt time.Time       `json:"scheduled_at"`
-	NextTryAt   *time.Time      `json:"next_try_at,omitempty"`
-	LastError   string          `json:"last_error,omitempty"`
-	Created     time.Time       `json:"created"`
-	Updated     time.Time       `json:"updated"`
-}
-
 // Handler is the function that processes a job
-type Handler func(ctx context.Context, j *Job) error
+type Handler func(ctx context.Context, j *models.BackgroundJob) error
 
 // ErrMaxAttempts indicates the job reached max attempts
 var ErrMaxAttempts = errors.New("max attempts reached")

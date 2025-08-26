@@ -12,6 +12,7 @@ type Repository struct {
 	Activity ActivityRepo
 	Question QuestionRepo
 	Job      JobRepo
+	Context  ContextRepo
 	Schema   SchemaRepo
 	Template TemplateRepo
 }
@@ -48,6 +49,10 @@ type QuestionRepo interface {
 type JobRepo interface {
 	CreateJob(ctx context.Context, j *models.Job) (int64, error)
 	UpdateStatus(ctx context.Context, id int64, status string) error
+	Enqueue(ctx context.Context, j *models.BackgroundJob) (int64, error)
+	FetchNext(ctx context.Context) (*models.BackgroundJob, error)
+	UpdateJob(ctx context.Context, j *models.BackgroundJob) error
+	MoveToDeadLetter(ctx context.Context, j *models.BackgroundJob) error
 }
 
 type SchemaRepo interface {
@@ -62,4 +67,12 @@ type TemplateRepo interface {
 	GetTemplate(ctx context.Context, name, version string) (*models.Template, error)
 	ListTemplates(ctx context.Context) ([]models.Template, error)
 	DeleteTemplate(ctx context.Context, name, version string) error
+}
+
+type ContextRepo interface {
+	UpsertEngineerContext(ctx context.Context, engineerID int64, contextJSON string, appliedBy string) (int64, error)
+	GetEngineerContext(ctx context.Context, engineerID int64) (string, int64, error)
+	CreateContextHistory(ctx context.Context, engineerID int64, contextJSON string, changesJSON *string, conflictsJSON *string, appliedBy string, version int64) (int64, error)
+	ListContextHistory(ctx context.Context, engineerID int64) ([]models.ContextHistory, error)
+	GetContextHistoryByID(ctx context.Context, engineerID int64, historyID int64) (*models.ContextHistory, error)
 }

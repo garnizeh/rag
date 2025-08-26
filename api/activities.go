@@ -71,11 +71,19 @@ func (h *ActivitiesHandler) CreateActivity(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// enqueue processing job
+	// enqueue legacy processing job (short-term compatibility)
 	job := &models.Job{Status: "pending"}
 	if _, err := h.jobRepo.CreateJob(r.Context(), job); err != nil {
 		// don't fail the request if job enqueue fails; log and continue
 		fmt.Println("warning: failed to create job:", err)
+	}
+
+	// enqueue AI analysis job into the worker queue: ai.analyze_activity
+	payloadObj := map[string]any{"engineer_id": req.EngineerID, "activity": req.Activity, "timestamp": *req.Timestamp}
+	b, _ := json.Marshal(payloadObj)
+	j := &models.BackgroundJob{Type: "ai.analyze_activity", Payload: b, Priority: 100, MaxAttempts: 3}
+	if _, err := h.jobRepo.Enqueue(r.Context(), j); err != nil {
+		fmt.Println("warning: failed to enqueue ai.analyze_activity job:", err)
 	}
 
 	writeJSON(w, postActivityResponse{ID: id}, http.StatusCreated)

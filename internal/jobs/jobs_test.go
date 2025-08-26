@@ -9,6 +9,8 @@ import (
 
 	"github.com/garnizeh/rag/internal/db"
 	"github.com/garnizeh/rag/internal/jobs"
+	"github.com/garnizeh/rag/internal/models"
+	"github.com/garnizeh/rag/internal/repository/sqlite"
 )
 
 func TestEnqueueAndProcess(t *testing.T) {
@@ -29,10 +31,10 @@ func TestEnqueueAndProcess(t *testing.T) {
 		t.Fatalf("create dlq table: %v", err)
 	}
 
-	repo := jobs.NewRepository(d)
+	repo := sqlite.New(d, logger)
 	handled := make(chan struct{}, 1)
 	handlers := map[string]jobs.Handler{
-		"test": func(ctx context.Context, j *jobs.Job) error {
+		"test": func(ctx context.Context, j *models.BackgroundJob) error {
 			handled <- struct{}{}
 			return nil
 		},

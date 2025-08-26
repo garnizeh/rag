@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"github.com/garnizeh/rag/internal/ai"
 	"github.com/garnizeh/rag/internal/config"
 	"github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/internal/jobs"
+	"github.com/garnizeh/rag/internal/models"
 	"github.com/garnizeh/rag/internal/repository/sqlite"
 	"github.com/garnizeh/rag/pkg/ollama"
 	"github.com/garnizeh/rag/pkg/repository"
@@ -73,13 +76,14 @@ func main() {
 	// Repository
 	sqliteRepo := sqlite.New(database, logger)
 	repo := repository.Repository{
-		Engineer: sqliteRepo,
-		Profile:  sqliteRepo,
-		Activity: sqliteRepo,
-		Question: sqliteRepo,
-		Job:      sqliteRepo,
-		Schema:   sqliteRepo,
-		Template: sqliteRepo,
+		Engineer:      sqliteRepo,
+		Profile:       sqliteRepo,
+		Activity:      sqliteRepo,
+		Question:      sqliteRepo,
+		Job:           sqliteRepo,
+		Context:       sqliteRepo,
+		Schema:        sqliteRepo,
+		Template:      sqliteRepo,
 	}
 
 	// Ollama client
@@ -118,6 +122,8 @@ func main() {
 	}
 	// propagate logger into AI subsystem for consistent structured logs
 	ai.SetLogger(logger)
+	// ensure processor logs are wired
+	ai.SetProcessorLogger(logger)
 
 	// Start Ollama probe within the AI engine so it manages client lifecycle and
 	// only probes when the engine is in degraded mode. Provide a derived context
@@ -127,6 +133,27 @@ func main() {
 	defer probeCancel()
 
 	handler := api.SetupRoutes(cfg, version, buildTime, repo, aiEngine, database, logger)
+
+	// Start background worker pool for jobs, including AI processing handler
+	handlers := map[string]jobs.Handler{
+		"ai.process_response": func(ctx context.Context, j *models.BackgroundJob) error {
+			var pl struct {
+				EngineerID int64           `json:"engineer_id"`
+				Response   json.RawMessage `json:"response"`
+			}
+			if err := json.Unmarshal(j.Payload, &pl); err != nil {
+				return err
+			}
+			var resp ai.AIResponse
+			if err := json.Unmarshal(pl.Response, &resp); err != nil {
+				return err
+			}
+			_, err := ai.ProcessAIResponse(ctx, &repo, pl.EngineerID, &resp)
+			return err
+		},
+	}
+	pool := jobs.NewWorkerPool(sqliteRepo, handlers, logger, 4)
+	pool.Start(rootCtx)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -160,6 +187,9 @@ func main() {
 		logger.Error("Server forced to shutdown", slog.Any("err", err))
 		os.Exit(1)
 	}
+
+	// Stop worker pool
+	pool.Stop()
 
 	// Close database connection
 	if err := database.Close(); err != nil {
