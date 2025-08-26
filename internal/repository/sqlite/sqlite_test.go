@@ -6,8 +6,8 @@ import (
 	"time"
 
 	dbpkg "github.com/garnizeh/rag/internal/db"
+	"github.com/garnizeh/rag/internal/models"
 	sqlite "github.com/garnizeh/rag/internal/repository/sqlite"
-	"github.com/garnizeh/rag/pkg/models"
 )
 
 func setupRepo(t *testing.T) (*sqlite.SQLiteRepo, func()) {

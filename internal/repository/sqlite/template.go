@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 func (r *SQLiteRepo) CreateTemplate(ctx context.Context, name, version, templateText string, schemaVersion *string, metadata *string) (int64, error) {

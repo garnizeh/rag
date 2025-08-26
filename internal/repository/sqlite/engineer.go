@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 func (r *SQLiteRepo) CreateEngineer(ctx context.Context, e *models.Engineer) (int64, error) {

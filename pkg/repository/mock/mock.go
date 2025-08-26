@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 // Test helpers and mocks

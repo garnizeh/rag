@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 	"github.com/garnizeh/rag/pkg/repository"
 )
 

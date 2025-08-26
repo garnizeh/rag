@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/garnizeh/rag/api"
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 	"github.com/garnizeh/rag/pkg/repository/mock"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"

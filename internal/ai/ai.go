@@ -13,7 +13,7 @@ import (
 	"log/slog"
 
 	"github.com/garnizeh/rag/internal/config"
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 	"github.com/garnizeh/rag/pkg/ollama"
 	"github.com/garnizeh/rag/pkg/repository"
 )

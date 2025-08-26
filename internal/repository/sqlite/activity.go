@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 func (r *SQLiteRepo) CreateActivity(ctx context.Context, a *models.Activity) (int64, error) {

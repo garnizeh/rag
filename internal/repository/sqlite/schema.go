@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 // CreateSchema inserts or updates a schema by version.

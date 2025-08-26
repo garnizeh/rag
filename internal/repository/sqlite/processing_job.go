@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 )
 
 func (r *SQLiteRepo) CreateJob(ctx context.Context, j *models.Job) (int64, error) {

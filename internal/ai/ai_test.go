@@ -6,7 +6,7 @@ import (
 
 	"github.com/garnizeh/rag/internal/ai"
 	"github.com/garnizeh/rag/internal/config"
-	"github.com/garnizeh/rag/pkg/models"
+	"github.com/garnizeh/rag/internal/models"
 	"github.com/garnizeh/rag/pkg/ollama"
 )
 
