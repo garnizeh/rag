@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS ai_schemas (
   version TEXT NOT NULL UNIQUE,
   description TEXT,
   schema_json TEXT NOT NULL,
-  created INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-  updated INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  created INTEGER NOT NULL,
+  updated INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ai_templates (
@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS ai_templates (
   template_text TEXT NOT NULL,
   schema_version TEXT,
   metadata TEXT,
-  created INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-  updated INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  created INTEGER NOT NULL,
+  updated INTEGER NOT NULL,
   UNIQUE(name, version)
 );
 
